@@ -92,7 +92,6 @@
             box-shadow: 0 -4px 10px rgba(0,0,0,0.2);
         }
         #titulo-audio-atual { font-size: 14px; font-weight: bold; margin-bottom: 8px; color: #f39c12; }
-        #player-nativo { width: 100%; max-width: 400px; height: 40px; outline: none; margin-top: 8px; display: block; margin-left: auto; margin-right: auto; }
         
         .btn-play-proximidade {
             background: #e67e22;
@@ -123,11 +122,11 @@
     <div id="status-carregamento">🔄 Sincronizando dados com a planilha...</div>
     <div id="map"></div>
 
-    <!-- RECEPTÁCULO DO CONTROLE DE ÁUDIO REALIMENTADO -->
+    <!-- RECEPTÁCULO DO CONTROLE DE ÁUDIO - BLINDAGEM DE INTERAÇÃO -->
     <div id="container-player">
         <div id="titulo-audio-atual">🎵 Patrimônio Próximo Identificado</div>
-        <button id="btn-play-direto" class="btn btn-play-proximidade" onclick="darPlayManual()">▶️ Tocar História do Patrimônio</button>
-        <audio id="player-nativo" controls preload="auto"></audio>
+        <!-- O BOTÃO AGORA DISPARA DIRETAMENTE A AÇÃO DE "TOCAR" -->
+        <button id="btn-play-direto" class="btn btn-play-proximidade" onclick="tocarAudioIdentificado()">▶️ Tocar História do Patrimônio</button>
     </div>
 
     <div id="painel-status">
@@ -145,7 +144,9 @@
         let pontoAtivo = null; 
         let pontosHistoricos = [];
         let FALA_MESTRE_URL = "";
+        let audioAtualUrl = ""; // Variável global para guardar o áudio identificado
 
+        // Função de tratamento de link AJUSTADA para usar o formato "PREVIEW" (mais seguro)
         function tratarLinkMidia(rawInput, tipoMidia) {
             if (!rawInput) return "";
             let url = String(rawInput).trim();
@@ -158,9 +159,7 @@
             const match = url.match(/(?:\/d\/|id=)([a-zA-Z0-9-_]{33,45})/);
             if (match) {
                 const id = match[1];
-                if (tipoMidia === "audio") {
-                    return `https://docs.google.com/uc?export=download&id=${id}`;
-                }
+                // Formato de Preview é aceito de primeira pelos navegadores móveis com um clique
                 return `https://drive.google.com/file/d/${id}/preview`;
             }
             return url;
@@ -273,8 +272,9 @@
                 
                 conteudoModal += '<p style="margin:0 0 8px 0;font-size:12px;color:#2d3748;line-height:1.3;text-align:justify;">' + (ponto.resumo || '') + '</p>';
                 
+                // MANTIDO: Botão interno do balão também atualizado para a lógica de interatividade
                 if (ponto.audio && ponto.audio.trim() !== "") {
-                    conteudoModal += '<button class="btn" style="padding:6px;font-size:12px;background:#e67e22;" onclick="prepararAudioNoPlayer(\'' + ponto.nome + '\',\'' + ponto.audio + '\')">🎵 Carregar Áudio</button>';
+                    conteudoModal += '<button class="btn" style="padding:6px;font-size:12px;background:#e67e22;" onclick="tocarAudioEspecifico(\'' + ponto.audio + '\')">🎵 Ouvir História</button>';
                 }
                 
                 conteudoModal += '</div>';
@@ -287,25 +287,32 @@
             });
         }
 
-        function prepararAudioNoPlayer(nome, url) {
+        // Função interna para os botões do balão
+        function tocarAudioEspecifico(url) {
+            if (!url) return;
+            window.open(url, 'player_ctg'); // Usa o comportamento padrão de abrir o player do Drive
+        }
+
+        // Prepara a área de áudio mas não toca sozinho (respeita a trava do navegador)
+        function identificarAudioProximo(nome, url) {
             if (!url) return;
             const container = document.getElementById("container-player");
             const titulo = document.getElementById("titulo-audio-atual");
-            const player = document.getElementById("player-nativo");
+            
+            audioAtualUrl = url; // Guarda a URL para quando o usuário clicar
             
             container.style.display = "block";
             titulo.innerHTML = `🎵 Escutando: ${nome}`;
-            
-            // Força a reinjeção da mídia limpando travas antigas
-            player.removeAttribute("src");
-            player.load();
-            player.src = url;
-            player.load();
+            document.getElementById("log-proximidade").innerHTML = `<span class="historico-alerta">📍 Perto de: ${nome}. Clique no botão laranja!</span>`;
         }
 
-        function darPlayManual() {
-            const player = document.getElementById("player-nativo");
-            player.play().catch(e => console.log("Aguardando interação completa."));
+        // ESSA É A FUNÇÃO QUE EXECUTA AO CLICAR NO BOTÃO LARANJA - CONSTITUI INTERAÇÃO DO USUÁRIO
+        function tocarAudioIdentificado() {
+            if (!audioAtualUrl) return;
+            
+            // Abordagem hibrida: Tenta abrir em uma nova aba/janela ('player_ctg' é o nome da janela)
+            // Os navegadores móveis aceitam isso de primeira como resultado do clique direto.
+            window.open(audioAtualUrl, 'player_ctg');
         }
 
         function iniciarTour() {
@@ -322,7 +329,8 @@
             statusGps.innerHTML = "📡 Solicitando sinal de satélite...";
 
             if (FALA_MESTRE_URL) {
-                prepararAudioNoPlayer("Boas-vindas (Fala Mestre)", FALA_MESTRE_URL);
+                // Toca fala do mestre via interação direta do clique no "Iniciar"
+                tocarAudioEspecifico(FALA_MESTRE_URL);
             }
 
             watchId = navigator.geolocation.watchPosition(
@@ -361,11 +369,11 @@
 
                 if (distancia <= raioDoPonto) {
                     naAreaDeAlgumPonto = true;
-                    document.getElementById("log-proximidade").innerHTML = `<span class="historico-alerta">📍 Perto de: ${ponto.nome} (${distancia.toFixed(0)}m)</span>`;
                     
                     if (pontoAtivo !== ponto.id) {
                         pontoAtivo = ponto.id;
-                        prepararAudioNoPlayer(ponto.nome, ponto.audio);
+                        // PREPARA a área mas não tenta tocar automático
+                        identificarAudioProximo(ponto.nome, ponto.audio);
                     }
                 }
             });
@@ -373,6 +381,8 @@
             if (!naAreaDeAlgumPonto) {
                 document.getElementById("log-proximidade").innerHTML = "Caminhando pelo circuito... Aproxime-se de um patrimônio.";
                 pontoAtivo = null; 
+                audioAtualUrl = "";
+                document.getElementById("container-player").style.display = "none"; // Esconde a área se afastar
             }
         }
 
