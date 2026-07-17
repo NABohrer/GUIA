@@ -36,7 +36,7 @@
         }
         
         #painel-status { 
-            padding: 12px; 
+            padding: 10px; 
             background: white; 
             margin: 8px; 
             border-radius: 8px; 
@@ -45,10 +45,10 @@
         }
         
         .btn { 
-            background: #2b6cb0; 
+            background: #e67e22; 
             color: white; 
             border: none; 
-            padding: 14px; 
+            padding: 12px; 
             font-size: 15px; 
             font-weight: bold; 
             border-radius: 6px; 
@@ -60,14 +60,13 @@
             text-decoration: none;
             display: block;
         }
-        .btn:active { background: #2c5282; }
         .btn:disabled { background: #cbd5e0; cursor: not-allowed; }
         
         #status-gps, #status-carregamento { 
             font-size: 12px; 
             font-weight: 600; 
             color: #4a5568; 
-            margin-top: 6px; 
+            margin-top: 4px; 
             text-align: center; 
         }
         
@@ -79,7 +78,26 @@
             padding-top: 6px; 
             text-align: center; 
         }
-        .historico-alerta { color: #e53e3e; font-weight: bold; }
+        .historico-alerta { color: #d35400; font-weight: bold; animation: piscar 1.5s infinite; }
+
+        /* PAINEL FIXO DO PLAYER DE ÁUDIO REFORÇADO */
+        #container-player {
+            display: none;
+            background: #2c3e50;
+            color: white;
+            padding: 12px;
+            text-align: center;
+            border-top: 3px solid #e67e22;
+            flex-shrink: 0;
+        }
+        #titulo-audio-atual { font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #f39c12; }
+        #player-nativo { width: 100%; max-width: 400px; height: 36px; outline: none; }
+
+        @keyframes piscar {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
 
         .gm-style-iw { max-width: 260px !important; padding: 6px !important; }
         .gm-style-iw-d { overflow-x: hidden !important; overflow-y: auto !important; max-height: 240px !important; }
@@ -97,20 +115,23 @@
     <div id="status-carregamento">🔄 Sincronizando dados com a planilha...</div>
     <div id="map"></div>
 
-    <div id="painel-status">
-        <button id="btn-iniciar" class="btn" onclick="iniciarTour()">▶️ Iniciar Tour Presencial (Ligar GPS)</button>
-        <div id="status-gps">Status: Pronto para iniciar o monitoramento.</div>
-        <div id="log-proximidade">As histórias tocarão sozinhas ao se aproximar dos monumentos.</div>
+    <!-- RECEPTÁCULO DO CONTROLE DE ÁUDIO - EVITA TRAVA DOS CELULARES -->
+    <div id="container-player">
+        <div id="titulo-audio-atual">🎵 Patrimônio Próximo Identificado</div>
+        <audio id="player-nativo" controls preload="auto"></audio>
     </div>
 
-    <!-- PLAYER DE ÁUDIO NATIVO INVISÍVEL PARA EVITAR BLOQUEIO DO NAVEGADOR -->
-    <audio id="player-nativo" style="display:none;" controls></audio>
+    <div id="painel-status">
+        <button id="btn-iniciar" class="btn" style="background:#2b6cb0;" onclick="iniciarTour()">▶️ Iniciar Tour Presencial (Ligar GPS)</button>
+        <div id="status-gps">Status: Pronto para iniciar o monitoramento.</div>
+        <div id="log-proximidade">Seu ponto de localização azul aparecerá no mapa ao iniciar.</div>
+    </div>
 
     <script>
         const LINK_DA_PLANILHA = 'https://docs.google.com/spreadsheets/d/1c0DxcjUOxrUiHX9ZGyI264FoyKjuhd4hllAqg1ZS0Us/edit?usp=sharing';
 
         let map;
-        let userMarker;
+        let userMarker = null;
         let watchId = null;
         let pontoAtivo = null; 
         let pontosHistoricos = [];
@@ -128,7 +149,6 @@
             const match = url.match(/(?:\/d\/|id=)([a-zA-Z0-9-_]{33,45})/);
             if (match) {
                 const id = match[1];
-                // IMPORTANTE: Para o player nativo HTML5 funcionar, precisamos do link de download direto (uc?export=download)
                 if (tipoMidia === "audio") {
                     return `https://docs.google.com/uc?export=download&id=${id}`;
                 }
@@ -181,7 +201,7 @@
                         let resumo = linha.c[3] ? String(extrairValorCelula(linha.c[3])).trim() : "";
                         
                         let linkAudio = linha.c[4] ? tratarLinkMidia(extrairValorCelula(linha.c[4]), "audio") : "";
-                        let raioPredefinido = linha.c[5] ? parseInt(extrairValorCelula(linha.c[5])) : 25; // Aumentado o padrão para 25m para melhor cobertura física
+                        let raioPredefinido = linha.c[5] ? parseInt(extrairValorCelula(linha.c[5])) : 25;
                         let categoria = linha.c[6] ? String(extrairValorCelula(linha.c[6])).trim() : "";
                         let linkFoto = linha.c[7] ? tratarLinkMidia(extrairValorCelula(linha.c[7]), "foto") : "";
 
@@ -197,21 +217,18 @@
                                 resumo: resumo,
                                 audio: linkAudio,
                                 raio: isNaN(raioPredefinido) ? 25 : raioPredefinido,
-                                categoria: categoria,
+                                categoria: category,
                                 foto: linkFoto
                             });
                         }
-                    } catch (erroLinha) {
-                        console.warn(erroLinha);
-                    }
+                    } catch (e) { console.warn(e); }
                 });
 
                 document.getElementById("status-carregamento").innerHTML = `✅ ${pontosHistoricos.length} monumentos carregados!`;
                 plotarPinsNoMapa();
 
             } catch (erro) {
-                console.error(erro);
-                document.getElementById("status-carregamento").innerHTML = "❌ Erro na sincronização dos dados.";
+                document.getElementById("status-carregamento").innerHTML = "❌ Erro na sincronização.";
             }
         }
 
@@ -248,7 +265,7 @@
                 conteudoModal += '<p style="margin:0 0 8px 0;font-size:12px;color:#2d3748;line-height:1.3;text-align:justify;">' + (ponto.resumo || '') + '</p>';
                 
                 if (ponto.audio && ponto.audio.trim() !== "") {
-                    conteudoModal += '<button class="btn" style="padding:6px;font-size:12px;" onclick="tocarAudioLocalmente(\'' + ponto.audio + '\')">🎵 Ouvir História</button>';
+                    conteudoModal += '<button class="btn" style="padding:6px;font-size:12px;" onclick="prepararAudioNoPlayer(\'' + ponto.nome + '\',\'' + ponto.audio + '\')">🎵 Carregar Áudio</button>';
                 }
                 
                 conteudoModal += '</div>';
@@ -261,46 +278,40 @@
             });
         }
 
-        // TOCA O ÁUDIO DE MANEIRA NATIVA NA PRÓPRIA PÁGINA (Sem abrir nova janela)
-        function tocarAudioLocalmente(url) {
+        // PREPARA O ÁUDIO NA BARRA DE CONTROLE VISÍVEL
+        function prepararAudioNoPlayer(nome, url) {
             if (!url) return;
+            const container = document.getElementById("container-player");
+            const titulo = document.getElementById("titulo-audio-atual");
             const player = document.getElementById("player-nativo");
+            
+            container.style.display = "block";
+            titulo.innerHTML = `🎵 Escutando: ${nome}`;
             player.src = url;
             player.load();
-            
-            // Tenta reproduzir e captura possíveis bloqueios do navegador
-            player.play().catch(e => {
-                console.log("Erro na reprodução automática:", e);
-                // Caso bloqueie, o usuário só precisa tocar uma vez no mapa ou no botão para autorizar o áudio
-            });
         }
 
         function iniciarTour() {
             const btn = document.getElementById("btn-iniciar");
             const statusGps = document.getElementById("status-gps");
-            
-            // Destrava o áudio no Safari/Chrome quando o usuário clica no botão laranja
-            const player = document.getElementById("player-nativo");
-            player.play().then(() => {
-                player.pause(); // Dá play e pausa rápido só para registrar a autorização de som
-                if (FALA_MESTRE_URL) {
-                    tocarAudioLocalmente(FALA_MESTRE_URL);
-                }
-            }).catch(e => console.log("Áudio aguardando ação"));
 
             if (!navigator.geolocation) {
-                statusGps.innerHTML = "❌ GPS não suportado neste aparelho.";
+                statusGps.innerHTML = "❌ GPS não suportado.";
                 return;
             }
 
             btn.disabled = true;
             btn.innerHTML = "Tour Ativo • Monitorando Posição";
-            statusGps.innerHTML = "📡 Conectando ao chip de GPS...";
+            statusGps.innerHTML = "📡 Solicitando sinal de satélite...";
+
+            if (FALA_MESTRE_URL) {
+                prepararAudioNoPlayer("Boas-vindas (Fala Mestre)", FALA_MESTRE_URL);
+            }
 
             watchId = navigator.geolocation.watchPosition(
                 processarMovimento, 
                 erroGps, 
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
             );
         }
 
@@ -313,35 +324,32 @@
 
             const posicaoAtual = { lat: userLat, lng: userLng };
             
-            // MARCADOR DE POSIÇÃO SIMPLES E SEGURO (Sem ícones customizados que quebram)
+            // MARCADOR AZUL EXCLUSIVO DE LOCALIZAÇÃO DO GOOGLE MAPS
             if (!userMarker) {
                 userMarker = new google.maps.Marker({
-                    position: positionAtual,
+                    position: posicaoAtual,
                     map: map,
-                    title: "Você está aqui"
+                    title: "Sua Posição",
+                    icon: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png" // ÍCONE BOLA AZUL REGULAR
                 });
+                map.setCenter(posicaoAtual);
             } else {
                 userMarker.setPosition(posicaoAtual);
-            }
-
-            // Centraliza o mapa na posição do usuário apenas na primeira vez para não irritar quem está navegando no mapa
-            if (map.getCenter().lat() === -22.2819) {
-                map.setCenter(posicaoAtual);
             }
 
             let naAreaDeAlgumPonto = false;
 
             pontosHistoricos.forEach(ponto => {
                 const distancia = calcularDistanciaHaversine(userLat, userLng, ponto.lat, ponto.lng);
-                let raioDoPonto = ponto.raio || 25; // Usando o raio de 25 metros ajustado
+                let raioDoPonto = ponto.raio || 25;
 
                 if (distancia <= raioDoPonto) {
                     naAreaDeAlgumPonto = true;
-                    document.getElementById("log-proximidade").innerHTML = `<span class="historico-alerta">📍 Você chegou ao: ${ponto.nome}!</span>`;
+                    document.getElementById("log-proximidade").innerHTML = `<span class="historico-alerta">📍 Perto de: ${ponto.nome} (${distancia.toFixed(0)}m). Toque no Play abaixo!</span>`;
                     
                     if (pontoAtivo !== ponto.id) {
                         pontoAtivo = ponto.id;
-                        tocarAudioLocalmente(ponto.audio);
+                        prepararAudioNoPlayer(ponto.nome, ponto.audio);
                     }
                 }
             });
@@ -364,7 +372,7 @@
         }
 
         function erroGps(err) {
-            document.getElementById("status-gps").innerHTML = "⚠️ Aguardando autorização ou sinal de GPS estável.";
+            document.getElementById("status-gps").innerHTML = "⚠️ Aguardando GPS estabilizar.";
         }
     </script>
 </body>
