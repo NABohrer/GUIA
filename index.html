@@ -78,25 +78,33 @@
             padding-top: 6px; 
             text-align: center; 
         }
-        .historico-alerta { color: #d35400; font-weight: bold; animation: piscar 1.5s infinite; }
+        .historico-alerta { color: #d35400; font-weight: bold; }
 
         /* PAINEL FIXO DO PLAYER DE ÁUDIO REFORÇADO */
         #container-player {
             display: none;
             background: #2c3e50;
             color: white;
-            padding: 12px;
+            padding: 14px;
             text-align: center;
-            border-top: 3px solid #e67e22;
+            border-top: 4px solid #e67e22;
             flex-shrink: 0;
+            box-shadow: 0 -4px 10px rgba(0,0,0,0.2);
         }
-        #titulo-audio-atual { font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #f39c12; }
-        #player-nativo { width: 100%; max-width: 400px; height: 36px; outline: none; }
+        #titulo-audio-atual { font-size: 14px; font-weight: bold; margin-bottom: 8px; color: #f39c12; }
+        #player-nativo { width: 100%; max-width: 400px; height: 40px; outline: none; margin-top: 8px; display: block; margin-left: auto; margin-right: auto; }
+        
+        .btn-play-proximidade {
+            background: #e67e22;
+            color: white;
+            animation: piscar-botao 1.2s infinite;
+            margin-bottom: 4px;
+        }
 
-        @keyframes piscar {
-            0% { opacity: 1; }
-            50% { opacity: 0.4; }
-            100% { opacity: 1; }
+        @keyframes piscar-botao {
+            0% { transform: scale(1); background: #e67e22; }
+            50% { transform: scale(1.02); background: #d35400; box-shadow: 0 0 12px #e67e22; }
+            100% { transform: scale(1); background: #e67e22; }
         }
 
         .gm-style-iw { max-width: 260px !important; padding: 6px !important; }
@@ -115,9 +123,10 @@
     <div id="status-carregamento">🔄 Sincronizando dados com a planilha...</div>
     <div id="map"></div>
 
-    <!-- RECEPTÁCULO DO CONTROLE DE ÁUDIO - EVITA TRAVA DOS CELULARES -->
+    <!-- RECEPTÁCULO DO CONTROLE DE ÁUDIO REALIMENTADO -->
     <div id="container-player">
         <div id="titulo-audio-atual">🎵 Patrimônio Próximo Identificado</div>
+        <button id="btn-play-direto" class="btn btn-play-proximidade" onclick="darPlayManual()">▶️ Tocar História do Patrimônio</button>
         <audio id="player-nativo" controls preload="auto"></audio>
     </div>
 
@@ -286,8 +295,17 @@
             
             container.style.display = "block";
             titulo.innerHTML = `🎵 Escutando: ${nome}`;
+            
+            // Força a reinjeção da mídia limpando travas antigas
+            player.removeAttribute("src");
+            player.load();
             player.src = url;
             player.load();
+        }
+
+        function darPlayManual() {
+            const player = document.getElementById("player-nativo");
+            player.play().catch(e => console.log("Aguardando interação completa."));
         }
 
         function iniciarTour() {
@@ -343,7 +361,7 @@
 
                 if (distancia <= raioDoPonto) {
                     naAreaDeAlgumPonto = true;
-                    document.getElementById("log-proximidade").innerHTML = `<span class="historico-alerta">📍 Perto de: ${ponto.nome} (${distancia.toFixed(0)}m). Toque no Play abaixo!</span>`;
+                    document.getElementById("log-proximidade").innerHTML = `<span class="historico-alerta">📍 Perto de: ${ponto.nome} (${distancia.toFixed(0)}m)</span>`;
                     
                     if (pontoAtivo !== ponto.id) {
                         pontoAtivo = ponto.id;
