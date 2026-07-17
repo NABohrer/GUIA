@@ -45,7 +45,7 @@
         }
         
         .btn { 
-            background: #e67e22; 
+            background: #2b6cb0; 
             color: white; 
             border: none; 
             padding: 12px; 
@@ -122,7 +122,7 @@
     </div>
 
     <div id="painel-status">
-        <button id="btn-iniciar" class="btn" style="background:#2b6cb0;" onclick="iniciarTour()">▶️ Iniciar Tour Presencial (Ligar GPS)</button>
+        <button id="btn-iniciar" class="btn" onclick="iniciarTour()">▶️ Iniciar Tour Presencial (Ligar GPS)</button>
         <div id="status-gps">Status: Pronto para iniciar o monitoramento.</div>
         <div id="log-proximidade">Seu ponto de localização azul aparecerá no mapa ao iniciar.</div>
     </div>
@@ -217,7 +217,7 @@
                                 resumo: resumo,
                                 audio: linkAudio,
                                 raio: isNaN(raioPredefinido) ? 25 : raioPredefinido,
-                                categoria: category,
+                                categoria: categoria,
                                 foto: linkFoto
                             });
                         }
@@ -265,7 +265,7 @@
                 conteudoModal += '<p style="margin:0 0 8px 0;font-size:12px;color:#2d3748;line-height:1.3;text-align:justify;">' + (ponto.resumo || '') + '</p>';
                 
                 if (ponto.audio && ponto.audio.trim() !== "") {
-                    conteudoModal += '<button class="btn" style="padding:6px;font-size:12px;" onclick="prepararAudioNoPlayer(\'' + ponto.nome + '\',\'' + ponto.audio + '\')">🎵 Carregar Áudio</button>';
+                    conteudoModal += '<button class="btn" style="padding:6px;font-size:12px;background:#e67e22;" onclick="prepararAudioNoPlayer(\'' + ponto.nome + '\',\'' + ponto.audio + '\')">🎵 Carregar Áudio</button>';
                 }
                 
                 conteudoModal += '</div>';
@@ -278,7 +278,6 @@
             });
         }
 
-        // PREPARA O ÁUDIO NA BARRA DE CONTROLE VISÍVEL
         function prepararAudioNoPlayer(nome, url) {
             if (!url) return;
             const container = document.getElementById("container-player");
@@ -324,13 +323,12 @@
 
             const posicaoAtual = { lat: userLat, lng: userLng };
             
-            // MARCADOR AZUL EXCLUSIVO DE LOCALIZAÇÃO DO GOOGLE MAPS
             if (!userMarker) {
                 userMarker = new google.maps.Marker({
                     position: posicaoAtual,
                     map: map,
                     title: "Sua Posição",
-                    icon: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png" // ÍCONE BOLA AZUL REGULAR
+                    icon: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png"
                 });
                 map.setCenter(posicaoAtual);
             } else {
