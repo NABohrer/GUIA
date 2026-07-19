@@ -173,6 +173,7 @@
             if (!spreadsheetId) return;
 
             try {
+                // O parâmetro &tqx=out:json traz a tabela estruturada
                 const urlGviz = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json`;
                 const resposta = await fetch(urlGviz);
                 const textoCompleto = await resposta.text();
@@ -183,10 +184,15 @@
                 pontosHistoricos = [];
                 let contadorId = 1;
 
-                linhas.forEach((linha) => {
+                // Percorre as linhas da planilha
+                linhas.forEach((linha, index) => {
                     try {
                         if (!linha || !linha.c) return;
                         
+                        // Proteção contra o cabeçalho duplo (Linhas 4 e 5 da planilha geralmente são os primeiros índices do JSON)
+                        // Se o índice for muito baixo ou se a linha não tiver dados válidos, ignoramos para não quebrar o mapa
+                        if (index < 2) return; 
+
                         const extrairValorCelula = (celula) => {
                             if (!celula) return "";
                             if (celula.v !== undefined && celula.v !== null) return celula.v;
@@ -195,40 +201,54 @@
                         };
 
                         let nomePatrimonio = linha.c[0] ? String(extrairValorCelula(linha.c[0])).trim() : "";
-                        if (!nomePatrimonio || nomePatrimonio.toLowerCase().includes("patrimônio") || nomePatrimonio.toLowerCase().includes("nome")) return;
-
-                        if (nomePatrimonio.toUpperCase() === "FALA MESTRE") {
-                            FALA_MESTRE_URL = tratarLinkMidia(linha.c[4] ? extrairValorCelula(linha.c[4]) : "", "audio");
-                            return;
-                        }
+                        
+                        // Validações extras para ignorar termos de cabeçalho que possam ter sobrado
+                        if (!nomePatrimonio || 
+                            nomePatrimonio.toLowerCase().includes("patrimônio") || 
+                            nomePatrimonio.toLowerCase().includes("nome") ||
+                            nomePatrimonio.toLowerCase().includes("coordenadas")) return;
 
                         let latRaw = linha.c[1] ? String(extrairValorCelula(linha.c[1])).replace(',', '.').trim() : null;
                         let lngRaw = linha.c[2] ? String(extrairValorCelula(linha.c[2])).replace(',', '.').trim() : null;
-                        let resumo = linha.c[3] ? String(extrairValorCelula(linha.c[3])).trim() : "";
                         
-                        let linkAudio = linha.c[4] ? tratarLinkMidia(extrairValorCelula(linha.c[4]), "audio") : "";
-                        let raioPredefinido = linha.c[5] ? parseInt(extrairValorCelula(linha.c[5])) : 25;
-                        let categoria = linha.c[6] ? String(extrairValorCelula(linha.c[6])).trim() : "";
-                        let linkFoto = linha.c[7] ? tratarLinkMidia(extrairValorCelula(linha.c[7]), "foto") : "";
-
                         let latNum = parseFloat(latRaw);
-                        let lngNum = parseFloat(lngNum = parseFloat(lngRaw));
+                        let lngNum = parseFloat(lngRaw);
 
+                        // Só armazena o ponto se a Latitude e Longitude forem números válidos
                         if (!isNaN(latNum) && !isNaN(lngNum)) {
-                            pontosHistoricos.push({
-                                id: contadorId++,
-                                nome: nomePatrimonio,
-                                lat: latNum,
-                                lng: lngNum,
-                                resumo: resumo,
-                                audio: linkAudio,
-                                raio: isNaN(raioPredefinido) ? 25 : raioPredefinido,
-                                categoria: categoria,
-                                foto: linkFoto
-                            });
+                            let resumo = linha.c[3] ? String(extrairValorCelula(linha.c[3])).trim() : "";
+                            let linkAudio = linha.c[4] ? tratarLinkMidia(extrairValorCelula(linha.c[4]), "audio") : "";
+                            let raioPredefinido = linha.c[5] ? parseInt(extrairValorCelula(linha.c[5])) : 25;
+                            let categoria = linha.c[6] ? String(extrairValorCelula(linha.c[6])).trim() : "";
+                            let linkFoto = linha.c[7] ? tratarLinkMidia(extrairValorCelula(linha.c[7]), "foto") : "";
+
+                            if (nomePatrimonio.toUpperCase() === "FALA MESTRE" || nomePatrimonio.toUpperCase() === "FALA_MESTRE") {
+                                FALA_MESTRE_URL = linkAudio;
+                            } else {
+                                pontosHistoricos.push({
+                                    id: contadorId++,
+                                    nome: nomePatrimonio,
+                                    lat: latNum,
+                                    lng: lngNum,
+                                    resumo: resumo,
+                                    audio: linkAudio,
+                                    raio: isNaN(raioPredefinido) ? 25 : raioPredefinido,
+                                    categoria: categoria,
+                                    foto: linkFoto
+                                });
+                            }
                         }
-                    } catch (e) { console.warn(e); }
+                    } catch (e) { console.warn("Erro ao processar linha da planilha:", e); }
                 });
+
+                document.getElementById("status-carregamento").innerHTML = `✅ ${pontosHistoricos.length} monumentos prontos para o circuito!`;
+                plotarPinsNoMapa();
+
+            } catch (erro) {
+                document.getElementById("status-carregamento").innerHTML = "❌ Erro ao sincronizar pontos históricos.";
+                console.error(erro);
+            }
+        }
 
                 document.getElementById("status-carregamento").innerHTML = `✅ ${pontosHistoricos.length} monumentos prontos para o circuito!`;
                 plotarPinsNoMapa();
