@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CTG - Cultural Tourist Guide</title>
+    <title>CTG - Cultural Tourist Guide (Versão de Rua)</title>
     
     <style>
         html, body { 
@@ -36,11 +36,11 @@
         }
         
         #painel-status { 
-            padding: 10px; 
+            padding: 12px; 
             background: white; 
             margin: 8px; 
             border-radius: 8px; 
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.05); 
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1); 
             flex-shrink: 0; 
         }
         
@@ -48,8 +48,8 @@
             background: #2b6cb0; 
             color: white; 
             border: none; 
-            padding: 12px; 
-            font-size: 15px; 
+            padding: 14px; 
+            font-size: 16px; 
             font-weight: bold; 
             border-radius: 6px; 
             cursor: pointer; 
@@ -60,51 +60,38 @@
             text-decoration: none;
             display: block;
         }
-        .btn:disabled { background: #cbd5e0; cursor: not-allowed; }
+        .btn:disabled { background: #48bb78; cursor: not-allowed; }
         
         #status-gps, #status-carregamento { 
             font-size: 12px; 
             font-weight: 600; 
             color: #4a5568; 
-            margin-top: 4px; 
+            margin-top: 6px; 
             text-align: center; 
         }
         
         #log-proximidade { 
-            font-size: 13px; 
-            color: #4a5568; 
-            margin-top: 6px; 
-            border-top: 1px solid #edf2f7; 
-            padding-top: 6px; 
+            font-size: 14px; 
+            font-weight: bold;
+            color: #2c3e50; 
+            margin-top: 8px; 
+            border-top: 2px solid #edf2f7; 
+            padding-top: 8px; 
             text-align: center; 
         }
         .historico-alerta { color: #d35400; font-weight: bold; }
 
-        /* PAINEL FIXO DO PLAYER DE ÁUDIO REFORÇADO */
-        #container-player {
+        /* Painel simplificado apenas para feedback visual de áudio tocando */
+        #container-player-rua {
             display: none;
             background: #2c3e50;
             color: white;
-            padding: 14px;
+            padding: 10px;
             text-align: center;
-            border-top: 4px solid #e67e22;
+            border-top: 4px solid #2ecc71;
             flex-shrink: 0;
-            box-shadow: 0 -4px 10px rgba(0,0,0,0.2);
         }
-        #titulo-audio-atual { font-size: 14px; font-weight: bold; margin-bottom: 8px; color: #f39c12; }
-        
-        .btn-play-proximidade {
-            background: #e67e22;
-            color: white;
-            animation: piscar-botao 1.2s infinite;
-            margin-bottom: 4px;
-        }
-
-        @keyframes piscar-botao {
-            0% { transform: scale(1); background: #e67e22; }
-            50% { transform: scale(1.02); background: #d35400; box-shadow: 0 0 12px #e67e22; }
-            100% { transform: scale(1); background: #e67e22; }
-        }
+        #titulo-audio-atual { font-size: 13px; font-weight: bold; color: #2ecc71; }
 
         .gm-style-iw { max-width: 260px !important; padding: 6px !important; }
         .gm-style-iw-d { overflow-x: hidden !important; overflow-y: auto !important; max-height: 240px !important; }
@@ -122,44 +109,55 @@
     <div id="status-carregamento">🔄 Sincronizando dados com a planilha...</div>
     <div id="map"></div>
 
-    <!-- RECEPTÁCULO DO CONTROLE DE ÁUDIO - BLINDAGEM DE INTERAÇÃO -->
-    <div id="container-player">
-        <div id="titulo-audio-atual">🎵 Patrimônio Próximo Identificado</div>
-        <!-- O BOTÃO AGORA DISPARA DIRETAMENTE A AÇÃO DE "TOCAR" -->
-        <button id="btn-play-direto" class="btn btn-play-proximidade" onclick="tocarAudioIdentificado()">▶️ Tocar História do Patrimônio</button>
+    <!-- Feedback visual discreto para quando o turista olhar para a tela -->
+    <div id="container-player-rua">
+        <div id="titulo-audio-atual">🔊 Tocando história agora...</div>
     </div>
 
     <div id="painel-status">
-        <button id="btn-iniciar" class="btn" onclick="iniciarTour()">▶️ Iniciar Tour Presencial (Ligar GPS)</button>
-        <div id="status-gps">Status: Pronto para iniciar o monitoramento.</div>
-        <div id="log-proximidade">Seu ponto de localização azul aparecerá no mapa ao iniciar.</div>
+        <button id="btn-iniciar" class="btn" onclick="iniciarTour()">▶️ Iniciar Tour Presencial (Ligar Guia de Áudio)</button>
+        <div id="status-gps">Status: Pronto para iniciar o monitoramento no bolso.</div>
+        <div id="log-proximidade">Coloque os fones e clique em Iniciar para ativar o modo automático.</div>
     </div>
+
+    <!-- Elemento de áudio invisível do HTML5 que garante a reprodução direta -->
+    <audio id="player-audio-nativo" preload="auto"></audio>
 
     <script>
         const LINK_DA_PLANILHA = 'https://docs.google.com/spreadsheets/d/1LjcYVhZQYbhkoaZb7IHeLB_5wUyxSCkHqqa7TC7_9Eg/edit?usp=sharing';
 
         let map;
         let userMarker = null;
+        let accuracyCircle = null;
         let watchId = null;
         let pontoAtivo = null; 
         let pontosHistoricos = [];
         let FALA_MESTRE_URL = "";
-        let audioAtualUrl = ""; // Variável global para guardar o áudio identificado
+        let playerNativo;
+        let usuarioInteragiuComMapa = false;
 
-        // Função de tratamento de link AJUSTADA para usar o formato "PREVIEW" (mais seguro)
+        // Nova função para converter os links brutos do GitHub em URLs diretas de áudio streaming
         function tratarLinkMidia(rawInput, tipoMidia) {
             if (!rawInput) return "";
             let url = String(rawInput).trim();
             
+            // Tratamento caso venha com fórmulas do Excel/Sheets
             if (url.includes('="') || url.includes('("')) {
                 const matchFormula = url.match(/"([^"]+)"/);
                 if (matchFormula) url = matchFormula[1];
             }
             
-            const match = url.match(/(?:\/d\/|id=)([a-zA-Z0-9-_]{33,45})/);
-            if (match) {
-                const id = match[1];
-                // Formato de Preview é aceito de primeira pelos navegadores móveis com um clique
+            // SE FOR LINK DO GITHUB: Transforma página web em link bruto (raw) para o player rodar direto
+            if (url.includes("github.com") && tipoMidia === "audio") {
+                url = url.replace("github.com", "raw.githubusercontent.com")
+                         .replace("/blob/", "/");
+                return url;
+            }
+
+            // Mantém suporte a fotos do drive ou links diretos
+            const matchDrive = url.match(/(?:\/d\/|id=)([a-zA-Z0-9-_]{33,45})/);
+            if (matchDrive) {
+                const id = matchDrive[1];
                 return `https://drive.google.com/file/d/${id}/preview`;
             }
             return url;
@@ -214,7 +212,7 @@
                         let linkFoto = linha.c[7] ? tratarLinkMidia(extrairValorCelula(linha.c[7]), "foto") : "";
 
                         let latNum = parseFloat(latRaw);
-                        let lngNum = parseFloat(lngRaw);
+                        let lngNum = parseFloat(lngNum = parseFloat(lngRaw));
 
                         if (!isNaN(latNum) && !isNaN(lngNum)) {
                             pontosHistoricos.push({
@@ -232,29 +230,36 @@
                     } catch (e) { console.warn(e); }
                 });
 
-                document.getElementById("status-carregamento").innerHTML = `✅ ${pontosHistoricos.length} monumentos carregados!`;
+                document.getElementById("status-carregamento").innerHTML = `✅ ${pontosHistoricos.length} monumentos prontos para o circuito!`;
                 plotarPinsNoMapa();
 
             } catch (erro) {
-                document.getElementById("status-carregamento").innerHTML = "❌ Erro na sincronização.";
+                document.getElementById("status-carregamento").innerHTML = "❌ Erro ao sincronizar pontos históricos.";
             }
         }
 
         function initApp() {
+            playerNativo = document.getElementById("player-audio-nativo");
             const centroFriburgo = { lat: -22.2819, lng: -42.5320 };
+            
             map = new google.maps.Map(document.getElementById("map"), {
-                zoom: 16,
+                zoom: 17, // Zoom ligeiramente mais próximo para navegação pedestre a pé
                 center: centroFriburgo,
                 mapTypeControl: false,
                 streetViewControl: false,
                 fullscreenControl: false
             });
+
+            // Se o usuário arrastar ou mexer no mapa com o dedo, paramos de forçar o mapa pro centro dele
+            map.addListener("dragstart", () => {
+                usuarioInteragiuComMapa = true;
+            });
+
             carregarDadosPlanilha();
         }
 
         function plotarPinsNoMapa() {
             if (!map || pontosHistoricos.length === 0) return;
-            map.setCenter({ lat: pontosHistoricos[0].lat, lng: pontosHistoricos[0].lng });
 
             pontosHistoricos.forEach(ponto => {
                 const pinElement = new google.maps.Marker({
@@ -271,48 +276,16 @@
                 }
                 
                 conteudoModal += '<p style="margin:0 0 8px 0;font-size:12px;color:#2d3748;line-height:1.3;text-align:justify;">' + (ponto.resumo || '') + '</p>';
-                
-                // MANTIDO: Botão interno do balão também atualizado para a lógica de interatividade
-                if (ponto.audio && ponto.audio.trim() !== "") {
-                    conteudoModal += '<button class="btn" style="padding:6px;font-size:12px;background:#e67e22;" onclick="tocarAudioEspecifico(\'' + ponto.audio + '\')">🎵 Ouvir História</button>';
-                }
-                
                 conteudoModal += '</div>';
 
                 const infoWindow = new google.maps.InfoWindow({ content: conteudoModal });
 
                 pinElement.addListener("click", () => {
                     infoWindow.open(map, pinElement);
+                    // Se clicar em um pin, toca o áudio dele sob demanda aproveitando a brecha
+                    if(ponto.audio) tocarAudioAutomatico(ponto.audio, ponto.nome);
                 });
             });
-        }
-
-        // Função interna para os botões do balão
-        function tocarAudioEspecifico(url) {
-            if (!url) return;
-            window.open(url, 'player_ctg'); // Usa o comportamento padrão de abrir o player do Drive
-        }
-
-        // Prepara a área de áudio mas não toca sozinho (respeita a trava do navegador)
-        function identificarAudioProximo(nome, url) {
-            if (!url) return;
-            const container = document.getElementById("container-player");
-            const titulo = document.getElementById("titulo-audio-atual");
-            
-            audioAtualUrl = url; // Guarda a URL para quando o usuário clicar
-            
-            container.style.display = "block";
-            titulo.innerHTML = `🎵 Escutando: ${nome}`;
-            document.getElementById("log-proximidade").innerHTML = `<span class="historico-alerta">📍 Perto de: ${nome}. Clique no botão laranja!</span>`;
-        }
-
-        // ESSA É A FUNÇÃO QUE EXECUTA AO CLICAR NO BOTÃO LARANJA - CONSTITUI INTERAÇÃO DO USUÁRIO
-        function tocarAudioIdentificado() {
-            if (!audioAtualUrl) return;
-            
-            // Abordagem hibrida: Tenta abrir em uma nova aba/janela ('player_ctg' é o nome da janela)
-            // Os navegadores móveis aceitam isso de primeira como resultado do clique direto.
-            window.open(audioAtualUrl, 'player_ctg');
         }
 
         function iniciarTour() {
@@ -320,23 +293,26 @@
             const statusGps = document.getElementById("status-gps");
 
             if (!navigator.geolocation) {
-                statusGps.innerHTML = "❌ GPS não suportado.";
+                statusGps.innerHTML = "❌ GPS não suportado neste aparelho.";
                 return;
             }
 
+            // Libera o player com um som mudo inicial. O navegador agora confia no nosso script!
+            playerNativo.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
+            playerNativo.play().catch(e => console.log("Ativação de áudio bypass concluída."));
+
             btn.disabled = true;
-            btn.innerHTML = "Tour Ativo • Monitorando Posição";
-            statusGps.innerHTML = "📡 Solicitando sinal de satélite...";
+            btn.innerHTML = "🎧 Modo Bolso Ativo • Caminhe Livremente";
+            statusGps.innerHTML = "📡 Buscando satélites de alta precisão...";
 
             if (FALA_MESTRE_URL) {
-                // Toca fala do mestre via interação direta do clique no "Iniciar"
-                tocarAudioEspecifico(FALA_MESTRE_URL);
+                tocarAudioAutomatico(FALA_MESTRE_URL, "Apresentação do Guia Histórico");
             }
 
             watchId = navigator.geolocation.watchPosition(
                 processarMovimento, 
                 erroGps, 
-                { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         }
 
@@ -345,20 +321,45 @@
             const userLng = position.coords.longitude;
             const precisao = position.coords.accuracy;
 
-            document.getElementById("status-gps").innerHTML = `📡 Sinal estável (Precisão: ${precisao.toFixed(1)}m)`;
+            document.getElementById("status-gps").innerHTML = `📡 Satélite Conectado (Precisão de rua: ${precisao.toFixed(1)}m)`;
 
             const posicaoAtual = { lat: userLat, lng: userLng };
             
+            // Atualiza ou desenha a marcação do usuário
             if (!userMarker) {
                 userMarker = new google.maps.Marker({
-                    position: posicaoAtual,
+                    position: { lat: userLat, lng: userLng },
                     map: map,
-                    title: "Sua Posição",
-                    icon: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png"
+                    title: "Você está aqui",
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 8,
+                        fillColor: '#2b6cb0',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2,
+                    }
                 });
-                map.setCenter(posicaoAtual);
+                
+                accuracyCircle = new google.maps.Circle({
+                    strokeColor: "#2b6cb0",
+                    strokeOpacity: 0.4,
+                    strokeWeight: 1,
+                    fillColor: "#2b6cb0",
+                    fillOpacity: 0.15,
+                    map: map,
+                    center: posicaoAtual,
+                    radius: precisao
+                });
             } else {
                 userMarker.setPosition(posicaoAtual);
+                accuracyCircle.setCenter(posicaoAtual);
+                accuracyCircle.setRadius(precisao);
+            }
+
+            // Centraliza o mapa se o turista NÃO estiver explorando manualmente
+            if (!usuarioInteragiuComMapa) {
+                map.setCenter(posicaoAtual);
             }
 
             let naAreaDeAlgumPonto = false;
@@ -372,17 +373,34 @@
                     
                     if (pontoAtivo !== ponto.id) {
                         pontoAtivo = ponto.id;
-                        // PREPARA a área mas não tenta tocar automático
-                        identificarAudioProximo(ponto.nome, ponto.audio);
+                        tocarAudioAutomatico(ponto.audio, ponto.nome);
                     }
                 }
             });
 
             if (!naAreaDeAlgumPonto) {
-                document.getElementById("log-proximidade").innerHTML = "Caminhando pelo circuito... Aproxime-se de um patrimônio.";
+                document.getElementById("log-proximidade").innerHTML = "🐾 Circuito Ativo: Caminhando entre a história de Friburgo...";
                 pontoAtivo = null; 
-                audioAtualUrl = "";
-                document.getElementById("container-player").style.display = "none"; // Esconde a área se afastar
+                document.getElementById("container-player-rua").style.display = "none";
+            }
+        }
+
+        // Função mágica do modo bolso: Altera o source e dá play imediato sem travar!
+        function tocarAudioAutomatico(url, nomePatrimonio) {
+            if (!url) return;
+            
+            try {
+                document.getElementById("container-player-rua").style.display = "block";
+                document.getElementById("titulo-audio-atual").innerHTML = `🔊 Ouvindo: ${nomePatrimonio}`;
+                document.getElementById("log-proximidade").innerHTML = `<span class="historico-alerta">📍 Você entrou em: ${nomePatrimonio}</span>`;
+                
+                playerNativo.pause();
+                playerNativo.src = url;
+                playerNativo.play().catch(erro => {
+                    console.warn("Falha no play automático em segundo plano:", erro);
+                });
+            } catch(e) {
+                console.error("Erro no controle do player nativo:", e);
             }
         }
 
@@ -398,7 +416,8 @@
         }
 
         function erroGps(err) {
-            document.getElementById("status-gps").innerHTML = "⚠️ Aguardando GPS estabilizar.";
+            // Em movimento na rua o sinal oscila constantemente, não quebramos o circuito por quedas rápidas
+            document.getElementById("status-gps").innerHTML = "⚠️ Sinal de GPS fraco... Mantenha-se em área aberta.";
         }
     </script>
 </body>
