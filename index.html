@@ -110,6 +110,21 @@
         let map;
         let pontosHistoricos = [];
         let marcadorUsuario = null;
+        let direcaoAtual = 0;
+
+        // Ícone SVG de Seta com Farol azul
+        function obterIconeSetaComFarol(angulo) {
+            return {
+                path: 'M 12 2 L 2 22 L 12 17 L 22 22 Z', // Seta estilizada tipo GPS
+                fillColor: '#1a73e8',
+                fillOpacity: 1,
+                scale: 1.2,
+                strokeColor: '#ffffff',
+                strokeWeight: 2,
+                rotation: angulo,
+                anchor: new google.maps.Point(12, 12)
+            };
+        }
 
         function tratarLinkMidia(rawInput, tipoMidia) {
             if (!rawInput) return "";
@@ -217,6 +232,7 @@
             });
 
             iniciarRastreamentoGPS();
+            iniciarBussola();
             carregarDadosPlanilha();
         }
 
@@ -234,14 +250,7 @@
                                 position: pos,
                                 map: map,
                                 title: "Sua Posição",
-                                icon: {
-                                    path: google.maps.SymbolPath.CIRCLE,
-                                    scale: 9,
-                                    fillColor: "#1a73e8",
-                                    fillOpacity: 1,
-                                    strokeColor: "#ffffff",
-                                    strokeWeight: 3
-                                }
+                                icon: obterIconeSetaComFarol(direcaoAtual)
                             });
                         } else {
                             marcadorUsuario.setPosition(pos);
@@ -255,10 +264,40 @@
             }
         }
 
+        function iniciarBussola() {
+            if (window.DeviceOrientationEvent) {
+                window.addEventListener('deviceorientation', (event) => {
+                    let angulo = 0;
+                    
+                    // Suporte para iOS (webkitCompassHeading) e Android (alpha)
+                    if (event.webkitCompassHeading) {
+                        angulo = event.webkitCompassHeading;
+                    } else if (event.alpha) {
+                        angulo = 360 - event.alpha;
+                    }
+
+                    direcaoAtual = Math.round(angulo);
+
+                    if (marcadorUsuario) {
+                        marcadorUsuario.setIcon(obterIconeSetaComFarol(direcaoAtual));
+                    }
+                }, true);
+            }
+        }
+
         function iniciarTourPresencial() {
             const playerIntro = document.getElementById("audio-introducao");
             playerIntro.style.display = "block";
             playerIntro.play();
+
+            // Solicita permissão explícita para Bússola no iOS se necessário
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission().then(response => {
+                    if (response === 'granted') {
+                        iniciarBussola();
+                    }
+                }).catch(console.error);
+            }
 
             if (marcadorUsuario) {
                 map.setCenter(marcadorUsuario.getPosition());
