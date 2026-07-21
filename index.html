@@ -21,32 +21,31 @@
         #header { 
             background: #1a365d; 
             color: white; 
-            padding: 10px 8px; 
+            padding: 12px 8px; 
             text-align: center; 
             box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
             flex-shrink: 0; 
         }
-        #header h2 { margin: 0; font-size: 15px; letter-spacing: 0.5px; }
-        #header p { margin: 2px 0 0 0; font-size: 11px; color: #bee3f8; }
+        #header h2 { margin: 0; font-size: 16px; letter-spacing: 0.5px; }
+        #header p { margin: 4px 0 0 0; font-size: 11px; color: #bee3f8; }
         
-        #tour-control {
-            background: #ffffff;
-            padding: 8px 12px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            text-align: center;
-            flex-shrink: 0;
-            border-bottom: 1px solid #cbd5e0;
-            z-index: 10;
-        }
-
         #status-carregamento { 
-            font-size: 11px; 
+            font-size: 12px; 
             font-weight: 600; 
             color: #4a5568; 
-            padding: 4px;
+            padding: 6px;
             text-align: center; 
             background: #edf2f7;
             flex-shrink: 0;
+        }
+
+        #tour-control {
+            background: #ffffff;
+            padding: 8px 12px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+            flex-shrink: 0;
+            border-bottom: 1px solid #e2e8f0;
         }
 
         #map { 
@@ -56,10 +55,10 @@
         }
 
         .btn-tour { 
-            background: #e67e22; 
+            background: #2b6cb0; 
             color: white; 
             border: none; 
-            padding: 10px 14px; 
+            padding: 10px 16px; 
             font-size: 13px; 
             font-weight: bold; 
             border-radius: 6px; 
@@ -70,7 +69,7 @@
             text-align: center;
             display: block;
         }
-        .btn-tour:active { background: #d35400; }
+        .btn-tour:active { background: #1a365d; }
 
         .gm-style-iw { max-width: 280px !important; padding: 6px !important; }
         .gm-style-iw-d { overflow-x: hidden !important; overflow-y: auto !important; max-height: 280px !important; }
@@ -92,20 +91,20 @@
         <p>Fundação Dom João VI & Arquivo Pró-Memória</p>
     </div>
 
-    <!-- PAINEL DO TOUR FIXO NO TOPO -->
+    <div id="status-carregamento">🔄 Sincronizando dados com a planilha...</div>
+
     <div id="tour-control">
         <button class="btn-tour" onclick="iniciarTourPresencial()">🚀 Iniciar Tour Presencial</button>
-        <audio id="audio-introducao" preload="none" style="display:none; width:100%; margin-top:6px;" controls>
+        <audio id="audio-introducao" style="display:none;" controls>
             <source src="https://raw.githubusercontent.com/NABohrer/GUIA/main/Introducao.mp3" type="audio/mpeg">
         </audio>
     </div>
-
-    <div id="status-carregamento">🔄 Sincronizando dados com a planilha...</div>
 
     <div id="map"></div>
 
     <script>
         const LINK_DA_PLANILHA = 'https://docs.google.com/spreadsheets/d/1ox-IF9LUtI0lRx42_EizzzCoaE-Y16rNjyTp-Vr1pVI/edit?usp=sharing';
+        const LINK_INTRODUCAO = 'https://raw.githubusercontent.com/NABohrer/GUIA/main/Introducao.mp3';
 
         let map;
         let pontosHistoricos = [];
@@ -236,11 +235,11 @@
                                 title: "Sua Posição",
                                 icon: {
                                     path: google.maps.SymbolPath.CIRCLE,
-                                    scale: 9,
-                                    fillColor: "#1a73e8",
+                                    scale: 8,
+                                    fillColor: "#4285F4",
                                     fillOpacity: 1,
                                     strokeColor: "#ffffff",
-                                    strokeWeight: 3
+                                    strokeWeight: 2
                                 }
                             });
                         } else {
