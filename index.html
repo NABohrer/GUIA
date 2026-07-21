@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CTG - Cultural Tourist Guide (Versão de Rua)</title>
+    <title>CTG - Cultural Tourist Guide</title>
     
     <style>
         html, body { 
@@ -29,72 +29,32 @@
         #header h2 { margin: 0; font-size: 16px; letter-spacing: 0.5px; }
         #header p { margin: 4px 0 0 0; font-size: 11px; color: #bee3f8; }
         
+        #status-carregamento { 
+            font-size: 12px; 
+            font-weight: 600; 
+            color: #4a5568; 
+            padding: 6px;
+            text-align: center; 
+            background: #edf2f7;
+            flex-shrink: 0;
+        }
+
         #map { 
             width: 100%; 
             flex-grow: 1; 
             background: #e2e8f0; 
         }
-        
-        #painel-status { 
-            padding: 12px; 
-            background: white; 
-            margin: 8px; 
-            border-radius: 8px; 
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.1); 
-            flex-shrink: 0; 
-        }
-        
-        .btn { 
-            background: #2b6cb0; 
-            color: white; 
-            border: none; 
-            padding: 14px; 
-            font-size: 16px; 
-            font-weight: bold; 
-            border-radius: 6px; 
-            cursor: pointer; 
-            width: 100%; 
-            box-sizing: border-box;
-            transition: background 0.2s; 
-            text-align: center;
-            text-decoration: none;
-            display: block;
-        }
-        .btn:disabled { background: #48bb78; cursor: not-allowed; }
-        
-        #status-gps, #status-carregamento { 
-            font-size: 12px; 
-            font-weight: 600; 
-            color: #4a5568; 
-            margin-top: 6px; 
-            text-align: center; 
-        }
-        
-        #log-proximidade { 
-            font-size: 14px; 
-            font-weight: bold;
-            color: #2c3e50; 
-            margin-top: 8px; 
-            border-top: 2px solid #edf2f7; 
-            padding-top: 8px; 
-            text-align: center; 
-        }
-        .historico-alerta { color: #d35400; font-weight: bold; }
 
-        /* Painel simplificado apenas para feedback visual de áudio tocando */
-        #container-player-rua {
-            display: none;
-            background: #2c3e50;
-            color: white;
-            padding: 10px;
-            text-align: center;
-            border-top: 4px solid #2ecc71;
-            flex-shrink: 0;
+        .gm-style-iw { max-width: 280px !important; padding: 6px !important; }
+        .gm-style-iw-d { overflow-x: hidden !important; overflow-y: auto !important; max-height: 280px !important; }
+        
+        /* Estilização personalizada para o player de áudio dentro do balão */
+        audio {
+            width: 100%;
+            height: 36px;
+            margin-top: 6px;
+            outline: none;
         }
-        #titulo-audio-atual { font-size: 13px; font-weight: bold; color: #2ecc71; }
-
-        .gm-style-iw { max-width: 260px !important; padding: 6px !important; }
-        .gm-style-iw-d { overflow-x: hidden !important; overflow-y: auto !important; max-height: 240px !important; }
     </style>
 
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAxjwD6OU5pNjdr-6J9xhc7Ut5E-IzSZYM&callback=initApp" async defer></script>
@@ -109,57 +69,37 @@
     <div id="status-carregamento">🔄 Sincronizando dados com a planilha...</div>
     <div id="map"></div>
 
-    <!-- Feedback visual discreto para quando o turista olhar para a tela -->
-    <div id="container-player-rua">
-        <div id="titulo-audio-atual">🔊 Tocando história agora...</div>
-    </div>
-
-    <div id="painel-status">
-        <button id="btn-iniciar" class="btn" onclick="iniciarTour()">▶️ Iniciar Tour Presencial (Ligar Guia de Áudio)</button>
-        <div id="status-gps">Status: Pronto para iniciar o monitoramento no bolso.</div>
-        <div id="log-proximidade">Coloque os fones e clique em Iniciar para ativar o modo automático.</div>
-    </div>
-
-    <!-- Elemento de áudio invisível do HTML5 que garante a reprodução direta -->
-    <audio id="player-audio-nativo" preload="auto"></audio>
-
     <script>
-        const LINK_DA_PLANILHA = 'https://docs.google.com/spreadsheets/d/1c0DxcjUOxrUiHX9ZGyI264FoyKjuhd4hllAqg1ZS0Us/edit?usp=sharing';
+        const LINK_DA_PLANILHA = 'https://docs.google.com/spreadsheets/d/1ox-IF9LUtI0lRx42_EizzzCoaE-Y16rNjyTp-Vr1pVI/edit?usp=sharing';
 
         let map;
-        let userMarker = null;
-        let accuracyCircle = null;
-        let watchId = null;
-        let pontoAtivo = null; 
         let pontosHistoricos = [];
-        let FALA_MESTRE_URL = "";
-        let playerNativo;
-        let usuarioInteragiuComMapa = false;
 
-        // Nova função para converter os links brutos do GitHub em URLs diretas de áudio streaming
         function tratarLinkMidia(rawInput, tipoMidia) {
             if (!rawInput) return "";
             let url = String(rawInput).trim();
             
-            // Tratamento caso venha com fórmulas do Excel/Sheets
+            // Se for fórmula do Google Sheets, extrai a URL interna
             if (url.includes('="') || url.includes('("')) {
                 const matchFormula = url.match(/"([^"]+)"/);
                 if (matchFormula) url = matchFormula[1];
             }
             
-            // SE FOR LINK DO GITHUB: Transforma página web em link bruto (raw) para o player rodar direto
-            if (url.includes("github.com") && tipoMidia === "audio") {
-                url = url.replace("github.com", "raw.githubusercontent.com")
-                         .replace("/blob/", "/");
+            // Se já for um arquivo direto de áudio (GitHub Raw, MP3, etc.), retorna como está
+            if (tipoMidia === "audio" && (url.toLowerCase().endsWith('.mp3') || url.toLowerCase().endsWith('.wav') || url.toLowerCase().endsWith('.ogg'))) {
                 return url;
             }
 
-            // Mantém suporte a fotos do drive ou links diretos
-            const matchDrive = url.match(/(?:\/d\/|id=)([a-zA-Z0-9-_]{33,45})/);
-            if (matchDrive) {
-                const id = matchDrive[1];
+            // Tratamento para links do Google Drive
+            const match = url.match(/(?:\/d\/|id=)([a-zA-Z0-9-_]{33,45})/);
+            if (match) {
+                const id = match[1];
+                if (tipoMidia === "audio") {
+                    return `https://docs.google.com/uc?export=download&id=${id}`;
+                }
                 return `https://drive.google.com/file/d/${id}/preview`;
             }
+
             return url;
         }
 
@@ -173,7 +113,6 @@
             if (!spreadsheetId) return;
 
             try {
-                // O parâmetro &tqx=out:json traz a tabela estruturada
                 const urlGviz = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json`;
                 const resposta = await fetch(urlGviz);
                 const textoCompleto = await resposta.text();
@@ -184,15 +123,10 @@
                 pontosHistoricos = [];
                 let contadorId = 1;
 
-                // Percorre as linhas da planilha
-                linhas.forEach((linha, index) => {
+                linhas.forEach((linha) => {
                     try {
                         if (!linha || !linha.c) return;
                         
-                        // Proteção contra o cabeçalho duplo (Linhas 4 e 5 da planilha geralmente são os primeiros índices do JSON)
-                        // Se o índice for muito baixo ou se a linha não tiver dados válidos, ignoramos para não quebrar o mapa
-                        if (index < 2) return; 
-
                         const extrairValorCelula = (celula) => {
                             if (!celula) return "";
                             if (celula.v !== undefined && celula.v !== null) return celula.v;
@@ -201,85 +135,59 @@
                         };
 
                         let nomePatrimonio = linha.c[0] ? String(extrairValorCelula(linha.c[0])).trim() : "";
-                        
-                        // Validações extras para ignorar termos de cabeçalho que possam ter sobrado
-                        if (!nomePatrimonio || 
-                            nomePatrimonio.toLowerCase().includes("patrimônio") || 
-                            nomePatrimonio.toLowerCase().includes("nome") ||
-                            nomePatrimonio.toLowerCase().includes("coordenadas")) return;
+                        if (!nomePatrimonio || nomePatrimonio.toLowerCase().includes("patrimônio") || nomePatrimonio.toLowerCase().includes("nome") || nomePatrimonio.toUpperCase() === "FALA MESTRE") return;
 
                         let latRaw = linha.c[1] ? String(extrairValorCelula(linha.c[1])).replace(',', '.').trim() : null;
                         let lngRaw = linha.c[2] ? String(extrairValorCelula(linha.c[2])).replace(',', '.').trim() : null;
+                        let resumo = linha.c[3] ? String(extrairValorCelula(linha.c[3])).trim() : "";
                         
+                        let linkAudio = linha.c[4] ? tratarLinkMidia(extrairValorCelula(linha.c[4]), "audio") : "";
+                        let raioPredefinido = linha.c[5] ? parseInt(extrairValorCelula(linha.c[5])) : 25;
+                        let categoria = linha.c[6] ? String(extrairValorCelula(linha.c[6])).trim() : "";
+                        let linkFoto = linha.c[7] ? tratarLinkMidia(extrairValorCelula(linha.c[7]), "foto") : "";
+
                         let latNum = parseFloat(latRaw);
                         let lngNum = parseFloat(lngRaw);
 
-                        // Só armazena o ponto se a Latitude e Longitude forem números válidos
                         if (!isNaN(latNum) && !isNaN(lngNum)) {
-                            let resumo = linha.c[3] ? String(extrairValorCelula(linha.c[3])).trim() : "";
-                            let linkAudio = linha.c[4] ? tratarLinkMidia(extrairValorCelula(linha.c[4]), "audio") : "";
-                            let raioPredefinido = linha.c[5] ? parseInt(extrairValorCelula(linha.c[5])) : 25;
-                            let categoria = linha.c[6] ? String(extrairValorCelula(linha.c[6])).trim() : "";
-                            let linkFoto = linha.c[7] ? tratarLinkMidia(extrairValorCelula(linha.c[7]), "foto") : "";
-
-                            if (nomePatrimonio.toUpperCase() === "FALA MESTRE" || nomePatrimonio.toUpperCase() === "FALA_MESTRE") {
-                                FALA_MESTRE_URL = linkAudio;
-                            } else {
-                                pontosHistoricos.push({
-                                    id: contadorId++,
-                                    nome: nomePatrimonio,
-                                    lat: latNum,
-                                    lng: lngNum,
-                                    resumo: resumo,
-                                    audio: linkAudio,
-                                    raio: isNaN(raioPredefinido) ? 25 : raioPredefinido,
-                                    categoria: categoria,
-                                    foto: linkFoto
-                                });
-                            }
+                            pontosHistoricos.push({
+                                id: contadorId++,
+                                nome: nomePatrimonio,
+                                lat: latNum,
+                                lng: lngNum,
+                                resumo: resumo,
+                                audio: linkAudio,
+                                raio: isNaN(raioPredefinido) ? 25 : raioPredefinido,
+                                categoria: categoria,
+                                foto: linkFoto
+                            });
                         }
-                    } catch (e) { console.warn("Erro ao processar linha da planilha:", e); }
+                    } catch (e) { console.warn(e); }
                 });
 
-                document.getElementById("status-carregamento").innerHTML = `✅ ${pontosHistoricos.length} monumentos prontos para o circuito!`;
+                document.getElementById("status-carregamento").innerHTML = `✅ ${pontosHistoricos.length} monumentos disponíveis para exploração`;
                 plotarPinsNoMapa();
 
             } catch (erro) {
-                document.getElementById("status-carregamento").innerHTML = "❌ Erro ao sincronizar pontos históricos.";
-                console.error(erro);
-            }
-        }
-
-                document.getElementById("status-carregamento").innerHTML = `✅ ${pontosHistoricos.length} monumentos prontos para o circuito!`;
-                plotarPinsNoMapa();
-
-            } catch (erro) {
-                document.getElementById("status-carregamento").innerHTML = "❌ Erro ao sincronizar pontos históricos.";
+                document.getElementById("status-carregamento").innerHTML = "❌ Erro na sincronização dos dados.";
             }
         }
 
         function initApp() {
-            playerNativo = document.getElementById("player-audio-nativo");
             const centroFriburgo = { lat: -22.2819, lng: -42.5320 };
-            
             map = new google.maps.Map(document.getElementById("map"), {
-                zoom: 17, // Zoom ligeiramente mais próximo para navegação pedestre a pé
+                zoom: 16,
                 center: centroFriburgo,
                 mapTypeControl: false,
                 streetViewControl: false,
                 fullscreenControl: false
             });
-
-            // Se o usuário arrastar ou mexer no mapa com o dedo, paramos de forçar o mapa pro centro dele
-            map.addListener("dragstart", () => {
-                usuarioInteragiuComMapa = true;
-            });
-
             carregarDadosPlanilha();
         }
 
         function plotarPinsNoMapa() {
             if (!map || pontosHistoricos.length === 0) return;
+            map.setCenter({ lat: pontosHistoricos[0].lat, lng: pontosHistoricos[0].lng });
 
             pontosHistoricos.forEach(ponto => {
                 const pinElement = new google.maps.Marker({
@@ -289,155 +197,33 @@
                 });
 
                 let conteudoModal = '<div style="width:100%; font-family:sans-serif; padding:2px; box-sizing:border-box;">' +
-                    '<h3 style="margin:0 0 4px 0;font-size:14px;color:#1a365d;font-weight:bold;">' + ponto.nome + '</h3>';
+                    '<h3 style="margin:0 0 6px 0;font-size:14px;color:#1a365d;font-weight:bold;">' + ponto.nome + '</h3>';
                 
                 if (ponto.foto && ponto.foto.trim() !== "") {
-                    conteudoModal += '<iframe src="' + ponto.foto + '" style="width:100%; height:120px; border:none; border-radius:4px; margin-bottom:4px;" scrolling="no"></iframe>';
+                    conteudoModal += '<iframe src="' + ponto.foto + '" style="width:100%; height:120px; border:none; border-radius:4px; margin-bottom:6px;" scrolling="no"></iframe>';
                 }
                 
                 conteudoModal += '<p style="margin:0 0 8px 0;font-size:12px;color:#2d3748;line-height:1.3;text-align:justify;">' + (ponto.resumo || '') + '</p>';
+                
+                // Renderização do Player HTML5 de Áudio Directo
+                if (ponto.audio && ponto.audio.trim() !== "") {
+                    conteudoModal += '<div style="margin-top:6px;">' +
+                        '<label style="font-size:11px; font-weight:bold; color:#1a365d;">🎵 Ouvir História:</label>' +
+                        '<audio controls preload="none" style="width:100%; margin-top:4px;">' +
+                            '<source src="' + ponto.audio + '" type="audio/mpeg">' +
+                            'Seu navegador não suporta o elemento de áudio.' +
+                        '</audio>' +
+                    '</div>';
+                }
+                
                 conteudoModal += '</div>';
 
                 const infoWindow = new google.maps.InfoWindow({ content: conteudoModal });
 
                 pinElement.addListener("click", () => {
                     infoWindow.open(map, pinElement);
-                    // Se clicar em um pin, toca o áudio dele sob demanda aproveitando a brecha
-                    if(ponto.audio) tocarAudioAutomatico(ponto.audio, ponto.nome);
                 });
             });
-        }
-
-        function iniciarTour() {
-            const btn = document.getElementById("btn-iniciar");
-            const statusGps = document.getElementById("status-gps");
-
-            if (!navigator.geolocation) {
-                statusGps.innerHTML = "❌ GPS não suportado neste aparelho.";
-                return;
-            }
-
-            // Libera o player com um som mudo inicial. O navegador agora confia no nosso script!
-            playerNativo.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
-            playerNativo.play().catch(e => console.log("Ativação de áudio bypass concluída."));
-
-            btn.disabled = true;
-            btn.innerHTML = "🎧 Modo Bolso Ativo • Caminhe Livremente";
-            statusGps.innerHTML = "📡 Buscando satélites de alta precisão...";
-
-            if (FALA_MESTRE_URL) {
-                tocarAudioAutomatico(FALA_MESTRE_URL, "Apresentação do Guia Histórico");
-            }
-
-            watchId = navigator.geolocation.watchPosition(
-                processarMovimento, 
-                erroGps, 
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-            );
-        }
-
-        function processarMovimento(position) {
-            const userLat = position.coords.latitude;
-            const userLng = position.coords.longitude;
-            const precisao = position.coords.accuracy;
-
-            document.getElementById("status-gps").innerHTML = `📡 Satélite Conectado (Precisão de rua: ${precisao.toFixed(1)}m)`;
-
-            const posicaoAtual = { lat: userLat, lng: userLng };
-            
-            // Atualiza ou desenha a marcação do usuário
-            if (!userMarker) {
-                userMarker = new google.maps.Marker({
-                    position: { lat: userLat, lng: userLng },
-                    map: map,
-                    title: "Você está aqui",
-                    icon: {
-                        path: google.maps.SymbolPath.CIRCLE,
-                        scale: 8,
-                        fillColor: '#2b6cb0',
-                        fillOpacity: 1,
-                        strokeColor: '#ffffff',
-                        strokeWeight: 2,
-                    }
-                });
-                
-                accuracyCircle = new google.maps.Circle({
-                    strokeColor: "#2b6cb0",
-                    strokeOpacity: 0.4,
-                    strokeWeight: 1,
-                    fillColor: "#2b6cb0",
-                    fillOpacity: 0.15,
-                    map: map,
-                    center: posicaoAtual,
-                    radius: precisao
-                });
-            } else {
-                userMarker.setPosition(posicaoAtual);
-                accuracyCircle.setCenter(posicaoAtual);
-                accuracyCircle.setRadius(precisao);
-            }
-
-            // Centraliza o mapa se o turista NÃO estiver explorando manualmente
-            if (!usuarioInteragiuComMapa) {
-                map.setCenter(posicaoAtual);
-            }
-
-            let naAreaDeAlgumPonto = false;
-
-            pontosHistoricos.forEach(ponto => {
-                const distancia = calcularDistanciaHaversine(userLat, userLng, ponto.lat, ponto.lng);
-                let raioDoPonto = ponto.raio || 25;
-
-                if (distancia <= raioDoPonto) {
-                    naAreaDeAlgumPonto = true;
-                    
-                    if (pontoAtivo !== ponto.id) {
-                        pontoAtivo = ponto.id;
-                        tocarAudioAutomatico(ponto.audio, ponto.nome);
-                    }
-                }
-            });
-
-            if (!naAreaDeAlgumPonto) {
-                document.getElementById("log-proximidade").innerHTML = "🐾 Circuito Ativo: Caminhando entre a história de Friburgo...";
-                pontoAtivo = null; 
-                document.getElementById("container-player-rua").style.display = "none";
-            }
-        }
-
-        // Função mágica do modo bolso: Altera o source e dá play imediato sem travar!
-        function tocarAudioAutomatico(url, nomePatrimonio) {
-            if (!url) return;
-            
-            try {
-                document.getElementById("container-player-rua").style.display = "block";
-                document.getElementById("titulo-audio-atual").innerHTML = `🔊 Ouvindo: ${nomePatrimonio}`;
-                document.getElementById("log-proximidade").innerHTML = `<span class="historico-alerta">📍 Você entrou em: ${nomePatrimonio}</span>`;
-                
-                playerNativo.pause();
-                playerNativo.src = url;
-                playerNativo.play().catch(erro => {
-                    console.warn("Falha no play automático em segundo plano:", erro);
-                });
-            } catch(e) {
-                console.error("Erro no controle do player nativo:", e);
-            }
-        }
-
-        function calcularDistanciaHaversine(lat1, lon1, lat2, lon2) {
-            const R = 6371000; 
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c; 
-        }
-
-        function erroGps(err) {
-            // Em movimento na rua o sinal oscila constantemente, não quebramos o circuito por quedas rápidas
-            document.getElementById("status-gps").innerHTML = "⚠️ Sinal de GPS fraco... Mantenha-se em área aberta.";
         }
     </script>
 </body>
