@@ -92,12 +92,9 @@
         <p>Fundação Dom João VI & Arquivo Pró-Memória</p>
     </div>
 
-    <!-- PAINEL DO TOUR FIXO NO TOPO -->
+    <!-- PAINEL DO TOUR FIXO NO TOPO (Limpo sem o player de introdução) -->
     <div id="tour-control">
-        <button class="btn-tour" onclick="iniciarTourPresencial()">🚀 Iniciar Tour Presencial</button>
-        <audio id="audio-introducao" preload="none" style="display:none; width:100%; margin-top:6px;" controls>
-            <source src="https://raw.githubusercontent.com/NABohrer/GUIA/main/Introducao.mp3" type="audio/mpeg">
-        </audio>
+        <button class="btn-tour" onclick="iniciarTourPresencial()">🚀 Centralizar Minha Posição</button>
     </div>
 
     <div id="status-carregamento">🔄 Sincronizando dados com a planilha...</div>
@@ -110,19 +107,16 @@
         let map;
         let pontosHistoricos = [];
         let marcadorUsuario = null;
-        let direcaoAtual = 0;
 
-        // Ícone SVG de Seta com Farol azul
-        function obterIconeSetaComFarol(angulo) {
+        // Ícone de Bolinha Azul Clássico (Estilo Google Maps Nativo)
+        function obterIconeBolinhaAzul() {
             return {
-                path: 'M 12 2 L 2 22 L 12 17 L 22 22 Z', // Seta estilizada tipo GPS
-                fillColor: '#1a73e8',
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 8,
+                fillColor: '#4285F4',
                 fillOpacity: 1,
-                scale: 1.2,
                 strokeColor: '#ffffff',
-                strokeWeight: 2,
-                rotation: angulo,
-                anchor: new google.maps.Point(12, 12)
+                strokeWeight: 3
             };
         }
 
@@ -232,7 +226,6 @@
             });
 
             iniciarRastreamentoGPS();
-            iniciarBussola();
             carregarDadosPlanilha();
         }
 
@@ -250,7 +243,7 @@
                                 position: pos,
                                 map: map,
                                 title: "Sua Posição",
-                                icon: obterIconeSetaComFarol(direcaoAtual)
+                                icon: obterIconeBolinhaAzul()
                             });
                         } else {
                             marcadorUsuario.setPosition(pos);
@@ -264,41 +257,7 @@
             }
         }
 
-        function iniciarBussola() {
-            if (window.DeviceOrientationEvent) {
-                window.addEventListener('deviceorientation', (event) => {
-                    let angulo = 0;
-                    
-                    // Suporte para iOS (webkitCompassHeading) e Android (alpha)
-                    if (event.webkitCompassHeading) {
-                        angulo = event.webkitCompassHeading;
-                    } else if (event.alpha) {
-                        angulo = 360 - event.alpha;
-                    }
-
-                    direcaoAtual = Math.round(angulo);
-
-                    if (marcadorUsuario) {
-                        marcadorUsuario.setIcon(obterIconeSetaComFarol(direcaoAtual));
-                    }
-                }, true);
-            }
-        }
-
         function iniciarTourPresencial() {
-            const playerIntro = document.getElementById("audio-introducao");
-            playerIntro.style.display = "block";
-            playerIntro.play();
-
-            // Solicita permissão explícita para Bússola no iOS se necessário
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission().then(response => {
-                    if (response === 'granted') {
-                        iniciarBussola();
-                    }
-                }).catch(console.error);
-            }
-
             if (marcadorUsuario) {
                 map.setCenter(marcadorUsuario.getPosition());
                 map.setZoom(18);
