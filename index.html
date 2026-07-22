@@ -92,9 +92,9 @@
         <p>Fundação Dom João VI & Arquivo Pró-Memória</p>
     </div>
 
-    <!-- PAINEL DO TOUR FIXO NO TOPO (Limpo sem o player de introdução) -->
+    <!-- PAINEL DO TOUR FIXO NO TOPO -->
     <div id="tour-control">
-        <button class="btn-tour" onclick="iniciarTourPresencial()">🚀 Centralizar Minha Posição</button>
+        <button class="btn-tour" onclick="iniciarTourPresencial()">🚀 Iniciar Tour Presencial</button>
     </div>
 
     <div id="status-carregamento">🔄 Sincronizando dados com a planilha...</div>
@@ -107,12 +107,13 @@
         let map;
         let pontosHistoricos = [];
         let marcadorUsuario = null;
+        let idMonitoramentoGPS = null;
 
-        // Ícone de Bolinha Azul Clássico (Estilo Google Maps Nativo)
+        // Ícone de Bolinha Azul Clássico
         function obterIconeBolinhaAzul() {
             return {
                 path: google.maps.SymbolPath.CIRCLE,
-                scale: 8,
+                scale: 9,
                 fillColor: '#4285F4',
                 fillOpacity: 1,
                 strokeColor: '#ffffff',
@@ -229,39 +230,71 @@
             carregarDadosPlanilha();
         }
 
+        function atualizarPosicaoNaTela(pos) {
+            if (!marcadorUsuario) {
+                marcadorUsuario = new google.maps.Marker({
+                    position: pos,
+                    map: map,
+                    title: "Sua Posição",
+                    icon: obterIconeBolinhaAzul()
+                });
+            } else {
+                marcadorUsuario.setPosition(pos);
+            }
+        }
+
         function iniciarRastreamentoGPS() {
             if ("geolocation" in navigator) {
-                navigator.geolocation.watchPosition(
+                const opcoesGPS = {
+                    enableHighAccuracy: true,
+                    maximumAge: 0,
+                    timeout: 10000
+                };
+
+                if (idMonitoramentoGPS) {
+                    navigator.geolocation.clearWatch(idMonitoramentoGPS);
+                }
+
+                idMonitoramentoGPS = navigator.geolocation.watchPosition(
                     (posicao) => {
                         const pos = {
                             lat: posicao.coords.latitude,
                             lng: posicao.coords.longitude
                         };
-
-                        if (!marcadorUsuario) {
-                            marcadorUsuario = new google.maps.Marker({
-                                position: pos,
-                                map: map,
-                                title: "Sua Posição",
-                                icon: obterIconeBolinhaAzul()
-                            });
-                        } else {
-                            marcadorUsuario.setPosition(pos);
-                        }
+                        atualizarPosicaoNaTela(pos);
                     },
                     (erro) => {
-                        console.warn("Permissão de localização negada ou indisponível.");
+                        console.warn("Aguardando sinal ou permissão do GPS...", erro);
                     },
-                    { enableHighAccuracy: true }
+                    opcoesGPS
                 );
             }
         }
 
         function iniciarTourPresencial() {
-            if (marcadorUsuario) {
-                map.setCenter(marcadorUsuario.getPosition());
-                map.setZoom(18);
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (posicao) => {
+                        const pos = {
+                            lat: posicao.coords.latitude,
+                            lng: posicao.coords.longitude
+                        };
+                        atualizarPosicaoNaTela(pos);
+                        map.setCenter(pos);
+                        map.setZoom(18);
+                    },
+                    () => {
+                        if (marcadorUsuario) {
+                            map.setCenter(marcadorUsuario.getPosition());
+                            map.setZoom(18);
+                        }
+                    },
+                    { enableHighAccuracy: true, maximumAge: 0 }
+                );
             }
+            
+            // Reinicia a escuta ativa do GPS para garantir movimento ao caminhar
+            iniciarRastreamentoGPS();
         }
 
         function plotarPinsNoMapa() {
