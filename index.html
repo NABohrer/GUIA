@@ -49,17 +49,6 @@
             flex-shrink: 0;
         }
 
-        #painel-diagnostico {
-            background: #fefcbf;
-            color: #744210;
-            font-size: 10px;
-            padding: 4px;
-            max-height: 50px;
-            overflow-y: auto;
-            border-bottom: 1px solid #d69e2e;
-            display: none;
-        }
-
         #map { 
             width: 100%; 
             flex-grow: 1; 
@@ -108,18 +97,19 @@
     </div>
 
     <div id="status-carregamento">🔄 Sincronizando dados com a planilha...</div>
-    <div id="painel-diagnostico"></div>
 
     <div id="map"></div>
 
     <script>
-        const LINK_DA_PLANILHA = 'https://docs.google.com/spreadsheets/d/1c0DxcjUOxrUiHX9ZGyI264FoyKjuhd4hllAqg1ZS0Us/edit?usp=sharing';
+        const LINK_DA_PLANILHA = 'https://docs.google.com/spreadsheets/d/1ox-IF9LUtI0lRx42_EizzzCoaE-Y16rNjyTp-Vr1pVI/edit?usp=sharing';
 
         let map;
         let pontosHistoricos = [];
         let marcadorUsuario = null;
         let idMonitoramentoGPS = null;
         let listaMarcadoresMapa = [];
+        let ultimoPontoTocadoId = null; // Evita que o mesmo áudio fique tocando em loop
+        let tourIniciado = false;
 
         function obterIconeBolinhaAzul() {
             return {
@@ -178,8 +168,7 @@
             if (!spreadsheetId) return;
 
             try {
-                // Força a leitura da primeira aba (gid=0)
-                const urlGviz = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&gid=0`;
+                const urlGviz = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&headers=1&tq=${encodeURIComponent('SELECT *')}`;
                 const resposta = await fetch(urlGviz);
                 const textoCompleto = await resposta.text();
                 
@@ -188,9 +177,8 @@
                 
                 pontosHistoricos = [];
                 let contadorId = 1;
-                let listaNomesLidos = [];
 
-                linhas.forEach((linha, index) => {
+                linhas.forEach((linha) => {
                     try {
                         if (!linha || !linha.c) return;
                         
@@ -202,14 +190,11 @@
                         };
 
                         let nomePatrimonio = linha.c[0] ? String(extrairValorCelula(linha.c[0])).trim() : "";
-                        
-                        // Ignora apenas se a célula da coluna A estiver completamente vazia ou for o cabeçalho exato
                         if (!nomePatrimonio || nomePatrimonio.toLowerCase() === "patrimônio / monumento") return;
 
                         let latRaw = linha.c[1] ? String(extrairValorCelula(linha.c[1])).replace(',', '.').replace(/[^\d.-]/g, '').trim() : "";
                         let lngRaw = linha.c[2] ? String(extrairValorCelula(linha.c[2])).replace(',', '.').replace(/[^\d.-]/g, '').trim() : "";
                         let resumo = linha.c[3] ? String(extrairValorCelula(linha.c[3])).trim() : "";
-                        
                         let linkAudio = linha.c[4] ? tratarLinkMidia(extrairValorCelula(linha.c[4]), "audio") : "";
                         let raioPredefinido = linha.c[5] ? parseInt(extrairValorCelula(linha.c[5])) : 25;
                         let categoria = linha.c[6] ? String(extrairValorCelula(linha.c[6])).trim() : "";
@@ -230,18 +215,11 @@
                                 categoria: categoria,
                                 foto: linkFoto
                             });
-                            listaNomesLidos.push(nomePatrimonio);
                         }
                     } catch (e) { console.warn(e); }
                 });
 
-                document.getElementById("status-carregamento").innerHTML = `✅ ${pontosHistoricos.length} monumentos carregados da planilha`;
-                
-                // Exibe a lista dos pontos lidos para conferência
-                const diagEl = document.getElementById("painel-diagnostico");
-                diagEl.style.display = "block";
-                diagEl.innerHTML = "<b>Lidos:</b> " + listaNomesLidos.join(" | ");
-
+                document.getElementById("status-carregamento").innerHTML = `✅ ${pontosHistoricos.length} monumentos carregados no mapa`;
                 plotarPinsNoMapa();
 
             } catch (erro) {
@@ -275,6 +253,55 @@
             } else {
                 marcadorUsuario.setPosition(pos);
             }
+
+            // Checa a proximidade continuamente se o Tour já estiver ativo
+            if (tourIniciado) {
+                verificarProximidadeEPlay(pos);
+            }
+        }
+
+        function verificarProximidadeEPlay(posUsuario) {
+            if (listaMarcadoresMapa.length === 0) return;
+
+            let pontoEncontradoNoRaio = null;
+
+            listaMarcadoresMapa.forEach(item => {
+                const dist = calcularDistanciaMetros(
+                    posUsuario.lat, posUsuario.lng,
+                    item.ponto.lat, item.ponto.lng
+                );
+
+                const raioEfetivo = item.ponto.raio || 25;
+
+                if (dist <= raioEfetivo) {
+                    pontoEncontradoNoRaio = item;
+                    document.getElementById("status-carregamento").innerHTML = `📍 Você está em: "${item.ponto.nome}" (${Math.round(dist)}m)`;
+                }
+            });
+
+            if (pontoEncontradoNoRaio) {
+                // Se entramos em um ponto novo que ainda não tocou áudio
+                if (ultimoPontoTocadoId !== pontoEncontradoNoRaio.ponto.id) {
+                    ultimoPontoTocadoId = pontoEncontradoNoRaio.ponto.id;
+
+                    // Abre a InfoWindow
+                    pontoEncontradoNoRaio.infoWindow.open(map, pontoEncontradoNoRaio.marker);
+
+                    // Espera a InfoWindow renderizar no DOM para pegar a tag <audio> e dar o play()
+                    setTimeout(() => {
+                        const idAudio = `audio-ponto-${pontoEncontradoNoRaio.ponto.id}`;
+                        const elementoAudio = document.getElementById(idAudio);
+                        if (elementoAudio) {
+                            elementoAudio.play().catch(e => {
+                                console.warn("O navegador bloqueou a reprodução automática:", e);
+                            });
+                        }
+                    }, 400);
+                }
+            } else {
+                // Se saímos do raio de alcance de qualquer ponto, libera para tocar novamente no futuro
+                ultimoPontoTocadoId = null;
+            }
         }
 
         function iniciarRastreamentoGPS() {
@@ -298,7 +325,7 @@
                         atualizarPosicaoNaTela(pos);
                     },
                     (erro) => {
-                        console.warn("Aguardando sinal ou permissão do GPS...", erro);
+                        console.warn("Aguardando sinal do GPS...", erro);
                     },
                     opcoesGPS
                 );
@@ -306,6 +333,8 @@
         }
 
         function iniciarTourPresencial() {
+            tourIniciado = true;
+
             if (!("geolocation" in navigator)) {
                 alert("Geolocalização não suportada no seu aparelho.");
                 return;
@@ -322,26 +351,8 @@
                     map.setCenter(posUsuario);
                     map.setZoom(18);
 
-                    if (listaMarcadoresMapa.length > 0) {
-                        let pontoMaisProximo = null;
-                        let menorDistancia = Infinity;
-
-                        listaMarcadoresMapa.forEach(item => {
-                            const dist = calcularDistanciaMetros(
-                                posUsuario.lat, posUsuario.lng,
-                                item.ponto.lat, item.ponto.lng
-                            );
-                            if (dist < menorDistancia) {
-                                menorDistancia = dist;
-                                pontoMaisProximo = item;
-                            }
-                        });
-
-                        if (pontoMaisProximo) {
-                            google.maps.event.trigger(pontoMaisProximo.marker, 'click');
-                            document.getElementById("status-carregamento").innerHTML = `📍 Mais próximo: "${pontoMaisProximo.ponto.nome}" (${Math.round(menorDistancia)}m)`;
-                        }
-                    }
+                    // Executa a checagem imediata assim que clica no botão
+                    verificarProximidadeEPlay(posUsuario);
                 },
                 (erro) => {
                     alert("Por favor, ative a localização/GPS do seu celular para iniciar o tour.");
@@ -364,6 +375,8 @@
                     title: ponto.nome
                 });
 
+                const idAudioTag = `audio-ponto-${ponto.id}`;
+
                 let conteudoModal = '<div style="width:100%; font-family:sans-serif; padding:2px; box-sizing:border-box;">' +
                     '<h3 style="margin:0 0 6px 0;font-size:14px;color:#1a365d;font-weight:bold;">' + ponto.nome + '</h3>';
                 
@@ -376,7 +389,7 @@
                 if (ponto.audio && ponto.audio.trim() !== "") {
                     conteudoModal += '<div style="margin-top:6px;">' +
                         '<label style="font-size:11px; font-weight:bold; color:#1a365d;">🎵 Ouvir História:</label>' +
-                        '<audio controls preload="none" style="width:100%; margin-top:4px;">' +
+                        '<audio id="' + idAudioTag + '" controls preload="none" style="width:100%; margin-top:4px;">' +
                             '<source src="' + ponto.audio + '" type="audio/mpeg">' +
                             'Seu navegador não suporta o elemento de áudio.' +
                         '</audio>' +
