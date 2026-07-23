@@ -21,11 +21,25 @@
         #header { 
             background: #1a365d; 
             color: white; 
-            padding: 10px 8px; 
-            text-align: center; 
+            padding: 10px 12px; 
             box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
             flex-shrink: 0; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
         }
+        
+        .header-logo {
+            height: 40px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .header-text {
+            text-align: left;
+        }
+
         #header h2 { margin: 0; font-size: 15px; letter-spacing: 0.5px; }
         #header p { margin: 2px 0 0 0; font-size: 11px; color: #bee3f8; }
         
@@ -99,8 +113,11 @@
 <body>
 
     <div id="header">
-        <h2>CTG - Cultural Tourist Guide</h2>
-        <p>Fundação Dom João VI & Arquivo Pró-Memória</p>
+        <img src="logo-ctg-new.png" alt="Logo CTG" class="header-logo">
+        <div class="header-text">
+            <h2>CTG - Cultural Tourist Guide</h2>
+            <p>Fundação Dom João VI & Arquivo Pró-Memória</p>
+        </div>
     </div>
 
     <div id="tour-control">
