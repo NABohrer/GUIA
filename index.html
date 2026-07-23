@@ -189,10 +189,10 @@
                         };
 
                         let nomePatrimonio = linha.c[0] ? String(extrairValorCelula(linha.c[0])).trim() : "";
-                        if (!nomePatrimonio || nomePatrimonio.toLowerCase().includes("patrimônio") || nomePatrimonio.toLowerCase().includes("nome") || nomePatrimonio.toUpperCase() === "FALA MESTRE") return;
+                        if (!nomePatrimonio || nomePatrimonio.toLowerCase().includes("patrimônio") || nomePatrimonio.toLowerCase().includes("nome")) return;
 
-                        let latRaw = linha.c[1] ? String(extrairValorCelula(linha.c[1])).replace(',', '.').trim() : null;
-                        let lngRaw = linha.c[2] ? String(extrairValorCelula(linha.c[2])).replace(',', '.').trim() : null;
+                        let latRaw = linha.c[1] ? String(extrairValorCelula(linha.c[1])).replace(',', '.').replace(/[^\d.-]/g, '').trim() : null;
+                        let lngRaw = linha.c[2] ? String(extrairValorCelula(linha.c[2])).replace(',', '.').replace(/[^\d.-]/g, '').trim() : null;
                         let resumo = linha.c[3] ? String(extrairValorCelula(linha.c[3])).trim() : "";
                         
                         let linkAudio = linha.c[4] ? tratarLinkMidia(extrairValorCelula(linha.c[4]), "audio") : "";
@@ -219,7 +219,7 @@
                     } catch (e) { console.warn(e); }
                 });
 
-                document.getElementById("status-carregamento").innerHTML = `✅ ${pontosHistoricos.length} monumentos disponíveis para exploração`;
+                document.getElementById("status-carregamento").innerHTML = `✅ ${pontosHistoricos.length} monumentos carregados da planilha`;
                 plotarPinsNoMapa();
 
             } catch (erro) {
@@ -300,7 +300,6 @@
                     map.setCenter(posUsuario);
                     map.setZoom(18);
 
-                    // Procura o ponto histórico mais próximo do usuário
                     if (listaMarcadoresMapa.length > 0) {
                         let pontoMaisProximo = null;
                         let menorDistancia = Infinity;
@@ -316,12 +315,12 @@
                             }
                         });
 
-                        // Se houver um ponto próximo (ex: a menos de 500 metros), abre o balão dele automaticamente
-                        if (pontoMaisProximo && menorDistancia <= 500) {
+                        // Se estiver a menos de 1000 metros (1km), abre o balão do ponto mais próximo
+                        if (pontoMaisProximo && menorDistancia <= 1000) {
                             google.maps.event.trigger(pontoMaisProximo.marker, 'click');
-                            document.getElementById("status-carregamento").innerHTML = `📍 Tour ativo: Mais próximo de "${pontoMaisProximo.ponto.nome}" (${Math.round(menorDistancia)}m)`;
-                        } else {
-                            document.getElementById("status-carregamento").innerHTML = "🚀 Tour presencial iniciado! Navegue pelos pontos no mapa.";
+                            document.getElementById("status-carregamento").innerHTML = `📍 Mais próximo: "${pontoMaisProximo.ponto.nome}" (${Math.round(menorDistancia)}m)`;
+                        } else if (pontoMaisProximo) {
+                            document.getElementById("status-carregamento").innerHTML = `🚀 Ponto mais próximo ("${pontoMaisProximo.ponto.nome}") está a ${Math.round(menorDistancia)}m de você.`;
                         }
                     }
                 },
@@ -336,8 +335,7 @@
 
         function plotarPinsNoMapa() {
             if (!map || pontosHistoricos.length === 0) return;
-            map.setCenter({ lat: pontosHistoricos[0].lat, lng: pontosHistoricos[0].lng });
-
+            
             listaMarcadoresMapa = [];
 
             pontosHistoricos.forEach(ponto => {
