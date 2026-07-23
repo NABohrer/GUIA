@@ -49,6 +49,17 @@
             flex-shrink: 0;
         }
 
+        #painel-diagnostico {
+            background: #fefcbf;
+            color: #744210;
+            font-size: 10px;
+            padding: 4px;
+            max-height: 50px;
+            overflow-y: auto;
+            border-bottom: 1px solid #d69e2e;
+            display: none;
+        }
+
         #map { 
             width: 100%; 
             flex-grow: 1; 
@@ -92,12 +103,12 @@
         <p>Fundação Dom João VI & Arquivo Pró-Memória</p>
     </div>
 
-    <!-- PAINEL DO TOUR FIXO NO TOPO -->
     <div id="tour-control">
         <button class="btn-tour" onclick="iniciarTourPresencial()">🚀 Iniciar Tour Presencial</button>
     </div>
 
     <div id="status-carregamento">🔄 Sincronizando dados com a planilha...</div>
+    <div id="painel-diagnostico"></div>
 
     <div id="map"></div>
 
@@ -167,7 +178,8 @@
             if (!spreadsheetId) return;
 
             try {
-                const urlGviz = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json`;
+                // Força a leitura da primeira aba (gid=0)
+                const urlGviz = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&gid=0`;
                 const resposta = await fetch(urlGviz);
                 const textoCompleto = await resposta.text();
                 
@@ -176,8 +188,9 @@
                 
                 pontosHistoricos = [];
                 let contadorId = 1;
+                let listaNomesLidos = [];
 
-                linhas.forEach((linha) => {
+                linhas.forEach((linha, index) => {
                     try {
                         if (!linha || !linha.c) return;
                         
@@ -189,10 +202,12 @@
                         };
 
                         let nomePatrimonio = linha.c[0] ? String(extrairValorCelula(linha.c[0])).trim() : "";
-                        if (!nomePatrimonio || nomePatrimonio.toLowerCase().includes("patrimônio") || nomePatrimonio.toLowerCase().includes("nome")) return;
+                        
+                        // Ignora apenas se a célula da coluna A estiver completamente vazia ou for o cabeçalho exato
+                        if (!nomePatrimonio || nomePatrimonio.toLowerCase() === "patrimônio / monumento") return;
 
-                        let latRaw = linha.c[1] ? String(extrairValorCelula(linha.c[1])).replace(',', '.').replace(/[^\d.-]/g, '').trim() : null;
-                        let lngRaw = linha.c[2] ? String(extrairValorCelula(linha.c[2])).replace(',', '.').replace(/[^\d.-]/g, '').trim() : null;
+                        let latRaw = linha.c[1] ? String(extrairValorCelula(linha.c[1])).replace(',', '.').replace(/[^\d.-]/g, '').trim() : "";
+                        let lngRaw = linha.c[2] ? String(extrairValorCelula(linha.c[2])).replace(',', '.').replace(/[^\d.-]/g, '').trim() : "";
                         let resumo = linha.c[3] ? String(extrairValorCelula(linha.c[3])).trim() : "";
                         
                         let linkAudio = linha.c[4] ? tratarLinkMidia(extrairValorCelula(linha.c[4]), "audio") : "";
@@ -215,11 +230,18 @@
                                 categoria: categoria,
                                 foto: linkFoto
                             });
+                            listaNomesLidos.push(nomePatrimonio);
                         }
                     } catch (e) { console.warn(e); }
                 });
 
                 document.getElementById("status-carregamento").innerHTML = `✅ ${pontosHistoricos.length} monumentos carregados da planilha`;
+                
+                // Exibe a lista dos pontos lidos para conferência
+                const diagEl = document.getElementById("painel-diagnostico");
+                diagEl.style.display = "block";
+                diagEl.innerHTML = "<b>Lidos:</b> " + listaNomesLidos.join(" | ");
+
                 plotarPinsNoMapa();
 
             } catch (erro) {
@@ -315,12 +337,9 @@
                             }
                         });
 
-                        // Se estiver a menos de 1000 metros (1km), abre o balão do ponto mais próximo
-                        if (pontoMaisProximo && menorDistancia <= 1000) {
+                        if (pontoMaisProximo) {
                             google.maps.event.trigger(pontoMaisProximo.marker, 'click');
                             document.getElementById("status-carregamento").innerHTML = `📍 Mais próximo: "${pontoMaisProximo.ponto.nome}" (${Math.round(menorDistancia)}m)`;
-                        } else if (pontoMaisProximo) {
-                            document.getElementById("status-carregamento").innerHTML = `🚀 Ponto mais próximo ("${pontoMaisProximo.ponto.nome}") está a ${Math.round(menorDistancia)}m de você.`;
                         }
                     }
                 },
