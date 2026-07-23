@@ -415,10 +415,19 @@
             listaMarcadoresMapa = [];
 
             pontosHistoricos.forEach(ponto => {
+                // Personaliza o ícone do pino com a sua logo
+                const iconeLogo = {
+                    url: 'logo-ctg-new.png',
+                    scaledSize: new google.maps.Size(32, 32), // Ajusta o tamanho da logo no mapa (32x32 pixels)
+                    origin: new google.maps.Point(0, 0),
+                    anchor: new google.maps.Point(16, 16)     // Centraliza a imagem exatamente no ponto
+                };
+
                 const pinElement = new google.maps.Marker({
                     position: { lat: ponto.lat, lng: ponto.lng },
                     map: map,
-                    title: ponto.nome
+                    title: ponto.nome,
+                    icon: iconeLogo // Usa o novo ícone em vez do pino vermelho
                 });
 
                 const idAudioTag = `audio-ponto-${ponto.id}`;
