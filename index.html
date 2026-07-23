@@ -53,11 +53,11 @@
             background: #fefcbf;
             color: #744210;
             font-size: 10px;
-            padding: 6px;
-            max-height: 100px;
+            padding: 4px;
+            max-height: 50px;
             overflow-y: auto;
             border-bottom: 1px solid #d69e2e;
-            word-break: break-all;
+            display: none;
         }
 
         #map { 
@@ -108,13 +108,12 @@
     </div>
 
     <div id="status-carregamento">🔄 Sincronizando dados com a planilha...</div>
-    <div id="painel-diagnostico">Iniciando diagnóstico...</div>
+    <div id="painel-diagnostico"></div>
 
     <div id="map"></div>
 
     <script>
-        // Adicionamos tq=SELECT * para forçar a busca de TODAS as colunas e linhas
-        const LINK_DA_PLANILHA = 'https://docs.google.com/spreadsheets/d/1ox-IF9LUtI0lRx42_EizzzCoaE-Y16rNjyTp-Vr1pVI/edit?usp=sharing';
+        const LINK_DA_PLANILHA = 'https://docs.google.com/spreadsheets/d/1c0DxcjUOxrUiHX9ZGyI264FoyKjuhd4hllAqg1ZS0Us/edit?usp=sharing';
 
         let map;
         let pontosHistoricos = [];
@@ -176,12 +175,11 @@
 
         async function carregarDadosPlanilha() {
             const spreadsheetId = extrairIdPlanilha(LINK_DA_PLANILHA);
-            const diagEl = document.getElementById("painel-diagnostico");
             if (!spreadsheetId) return;
 
             try {
-                // Adicionado tq=SELECT * e headers=1 para obrigar a API a trazer TUDO sem filtrar nada por tipo de dados
-                const urlGviz = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&headers=1&tq=${encodeURIComponent('SELECT *')}`;
+                // Força a leitura da primeira aba (gid=0)
+                const urlGviz = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&gid=0`;
                 const resposta = await fetch(urlGviz);
                 const textoCompleto = await resposta.text();
                 
@@ -190,9 +188,7 @@
                 
                 pontosHistoricos = [];
                 let contadorId = 1;
-                let diagnosticoLinhas = [];
-
-                diagEl.innerHTML = `<b>Linhas brutas recebidas do Google: ${linhas.length}</b><br>`;
+                let listaNomesLidos = [];
 
                 linhas.forEach((linha, index) => {
                     try {
@@ -207,6 +203,7 @@
 
                         let nomePatrimonio = linha.c[0] ? String(extrairValorCelula(linha.c[0])).trim() : "";
                         
+                        // Ignora apenas se a célula da coluna A estiver completamente vazia ou for o cabeçalho exato
                         if (!nomePatrimonio || nomePatrimonio.toLowerCase() === "patrimônio / monumento") return;
 
                         let latRaw = linha.c[1] ? String(extrairValorCelula(linha.c[1])).replace(',', '.').replace(/[^\d.-]/g, '').trim() : "";
@@ -221,8 +218,6 @@
                         let latNum = parseFloat(latRaw);
                         let lngNum = parseFloat(lngRaw);
 
-                        diagnosticoLinhas.push(`[${nomePatrimonio} | Lat:${latNum} Lng:${lngNum}]`);
-
                         if (!isNaN(latNum) && !isNaN(lngNum)) {
                             pontosHistoricos.push({
                                 id: contadorId++,
@@ -235,18 +230,22 @@
                                 categoria: categoria,
                                 foto: linkFoto
                             });
+                            listaNomesLidos.push(nomePatrimonio);
                         }
                     } catch (e) { console.warn(e); }
                 });
 
-                document.getElementById("status-carregamento").innerHTML = `✅ ${pontosHistoricos.length} monumentos prontos no mapa`;
-                diagEl.innerHTML += "<b>Mapeados:</b> " + diagnosticoLinhas.join(" ");
+                document.getElementById("status-carregamento").innerHTML = `✅ ${pontosHistoricos.length} monumentos carregados da planilha`;
+                
+                // Exibe a lista dos pontos lidos para conferência
+                const diagEl = document.getElementById("painel-diagnostico");
+                diagEl.style.display = "block";
+                diagEl.innerHTML = "<b>Lidos:</b> " + listaNomesLidos.join(" | ");
 
                 plotarPinsNoMapa();
 
             } catch (erro) {
                 document.getElementById("status-carregamento").innerHTML = "❌ Erro na sincronização dos dados.";
-                diagEl.innerHTML = "<b>Erro de leitura:</b> " + erro.message;
             }
         }
 
