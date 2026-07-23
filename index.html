@@ -120,6 +120,8 @@
         let marcadorUsuario = null;
         let idMonitoramentoGPS = null;
         let listaMarcadoresMapa = [];
+        let ultimoPontoTocadoId = null; 
+        let tourIniciado = false;
 
         function obterIconeBolinhaAzul() {
             return {
@@ -275,6 +277,60 @@
             } else {
                 marcadorUsuario.setPosition(pos);
             }
+
+            if (tourIniciado) {
+                verificarProximidadeEPlay(pos);
+            }
+        }
+
+        function verificarProximidadeEPlay(posUsuario) {
+            if (listaMarcadoresMapa.length === 0) return;
+
+            let pontoEncontradoNoRaio = null;
+            let menorDistanciaGeral = Infinity;
+            let nomePontoMaisProximo = "";
+
+            listaMarcadoresMapa.forEach(item => {
+                const dist = calcularDistanciaMetros(
+                    posUsuario.lat, posUsuario.lng,
+                    item.ponto.lat, item.ponto.lng
+                );
+
+                if (dist < menorDistanciaGeral) {
+                    menorDistanciaGeral = dist;
+                    nomePontoMaisProximo = item.ponto.nome;
+                }
+
+                // Respeita estritamente o raio definido na planilha
+                const raioEfetivo = item.ponto.raio || 25;
+
+                if (dist <= raioEfetivo) {
+                    pontoEncontradoNoRaio = item;
+                    document.getElementById("status-carregamento").innerHTML = `📍 Dentro do raio de: "${item.ponto.nome}" (${Math.round(dist)}m)`;
+                }
+            });
+
+            if (pontoEncontradoNoRaio) {
+                if (ultimoPontoTocadoId !== pontoEncontradoNoRaio.ponto.id) {
+                    ultimoPontoTocadoId = pontoEncontradoNoRaio.ponto.id;
+
+                    pontoEncontradoNoRaio.infoWindow.open(map, pontoEncontradoNoRaio.marker);
+
+                    setTimeout(() => {
+                        const idAudio = `audio-ponto-${pontoEncontradoNoRaio.ponto.id}`;
+                        const elementoAudio = document.getElementById(idAudio);
+                        if (elementoAudio) {
+                            elementoAudio.play().catch(e => {
+                                console.warn("O navegador bloqueou a reprodução automática:", e);
+                            });
+                        }
+                    }, 400);
+                }
+            } else {
+                // Fora do raio: atualiza a barra avisando a distância do ponto mais próximo sem abrir o balão
+                document.getElementById("status-carregamento").innerHTML = `🚶‍♂️ Em deslocamento... Próximo: "${nomePontoMaisProximo}" (${Math.round(menorDistanciaGeral)}m)`;
+                ultimoPontoTocadoId = null;
+            }
         }
 
         function iniciarRastreamentoGPS() {
@@ -306,6 +362,8 @@
         }
 
         function iniciarTourPresencial() {
+            tourIniciado = true;
+
             if (!("geolocation" in navigator)) {
                 alert("Geolocalização não suportada no seu aparelho.");
                 return;
@@ -322,26 +380,8 @@
                     map.setCenter(posUsuario);
                     map.setZoom(18);
 
-                    if (listaMarcadoresMapa.length > 0) {
-                        let pontoMaisProximo = null;
-                        let menorDistancia = Infinity;
-
-                        listaMarcadoresMapa.forEach(item => {
-                            const dist = calcularDistanciaMetros(
-                                posUsuario.lat, posUsuario.lng,
-                                item.ponto.lat, item.ponto.lng
-                            );
-                            if (dist < menorDistancia) {
-                                menorDistancia = dist;
-                                pontoMaisProximo = item;
-                            }
-                        });
-
-                        if (pontoMaisProximo) {
-                            google.maps.event.trigger(pontoMaisProximo.marker, 'click');
-                            document.getElementById("status-carregamento").innerHTML = `📍 Mais próximo: "${pontoMaisProximo.ponto.nome}" (${Math.round(menorDistancia)}m)`;
-                        }
-                    }
+                    // Valida imediatamente a posição contra o raio dos pontos
+                    verificarProximidadeEPlay(posUsuario);
                 },
                 (erro) => {
                     alert("Por favor, ative a localização/GPS do seu celular para iniciar o tour.");
@@ -364,6 +404,8 @@
                     title: ponto.nome
                 });
 
+                const idAudioTag = `audio-ponto-${ponto.id}`;
+
                 let conteudoModal = '<div style="width:100%; font-family:sans-serif; padding:2px; box-sizing:border-box;">' +
                     '<h3 style="margin:0 0 6px 0;font-size:14px;color:#1a365d;font-weight:bold;">' + ponto.nome + '</h3>';
                 
@@ -376,7 +418,7 @@
                 if (ponto.audio && ponto.audio.trim() !== "") {
                     conteudoModal += '<div style="margin-top:6px;">' +
                         '<label style="font-size:11px; font-weight:bold; color:#1a365d;">🎵 Ouvir História:</label>' +
-                        '<audio controls preload="none" style="width:100%; margin-top:4px;">' +
+                        '<audio id="' + idAudioTag + '" controls preload="none" style="width:100%; margin-top:4px;">' +
                             '<source src="' + ponto.audio + '" type="audio/mpeg">' +
                             'Seu navegador não suporta o elemento de áudio.' +
                         '</audio>' +
