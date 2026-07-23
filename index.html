@@ -108,8 +108,8 @@
         let pontosHistoricos = [];
         let marcadorUsuario = null;
         let idMonitoramentoGPS = null;
+        let listaMarcadoresMapa = [];
 
-        // Ícone de Bolinha Azul Clássico
         function obterIconeBolinhaAzul() {
             return {
                 path: google.maps.SymbolPath.CIRCLE,
@@ -119,6 +119,17 @@
                 strokeColor: '#ffffff',
                 strokeWeight: 3
             };
+        }
+
+        function calcularDistanciaMetros(lat1, lon1, lat2, lon2) {
+            const R = 6371000;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
         }
 
         function tratarLinkMidia(rawInput, tipoMidia) {
@@ -236,7 +247,8 @@
                     position: pos,
                     map: map,
                     title: "Sua Posição",
-                    icon: obterIconeBolinhaAzul()
+                    icon: obterIconeBolinhaAzul(),
+                    zIndex: 9999
                 });
             } else {
                 marcadorUsuario.setPosition(pos);
@@ -272,34 +284,61 @@
         }
 
         function iniciarTourPresencial() {
-            if ("geolocation" in navigator) {
-                navigator.geolocation.getCurrentPosition(
-                    (posicao) => {
-                        const pos = {
-                            lat: posicao.coords.latitude,
-                            lng: posicao.coords.longitude
-                        };
-                        atualizarPosicaoNaTela(pos);
-                        map.setCenter(pos);
-                        map.setZoom(18);
-                    },
-                    () => {
-                        if (marcadorUsuario) {
-                            map.setCenter(marcadorUsuario.getPosition());
-                            map.setZoom(18);
-                        }
-                    },
-                    { enableHighAccuracy: true, maximumAge: 0 }
-                );
+            if (!("geolocation" in navigator)) {
+                alert("Geolocalização não suportada no seu aparelho.");
+                return;
             }
-            
-            // Reinicia a escuta ativa do GPS para garantir movimento ao caminhar
+
+            navigator.geolocation.getCurrentPosition(
+                (posicao) => {
+                    const posUsuario = {
+                        lat: posicao.coords.latitude,
+                        lng: posicao.coords.longitude
+                    };
+
+                    atualizarPosicaoNaTela(posUsuario);
+                    map.setCenter(posUsuario);
+                    map.setZoom(18);
+
+                    // Procura o ponto histórico mais próximo do usuário
+                    if (listaMarcadoresMapa.length > 0) {
+                        let pontoMaisProximo = null;
+                        let menorDistancia = Infinity;
+
+                        listaMarcadoresMapa.forEach(item => {
+                            const dist = calcularDistanciaMetros(
+                                posUsuario.lat, posUsuario.lng,
+                                item.ponto.lat, item.ponto.lng
+                            );
+                            if (dist < menorDistancia) {
+                                menorDistancia = dist;
+                                pontoMaisProximo = item;
+                            }
+                        });
+
+                        // Se houver um ponto próximo (ex: a menos de 500 metros), abre o balão dele automaticamente
+                        if (pontoMaisProximo && menorDistancia <= 500) {
+                            google.maps.event.trigger(pontoMaisProximo.marker, 'click');
+                            document.getElementById("status-carregamento").innerHTML = `📍 Tour ativo: Mais próximo de "${pontoMaisProximo.ponto.nome}" (${Math.round(menorDistancia)}m)`;
+                        } else {
+                            document.getElementById("status-carregamento").innerHTML = "🚀 Tour presencial iniciado! Navegue pelos pontos no mapa.";
+                        }
+                    }
+                },
+                (erro) => {
+                    alert("Por favor, ative a localização/GPS do seu celular para iniciar o tour.");
+                },
+                { enableHighAccuracy: true, maximumAge: 0 }
+            );
+
             iniciarRastreamentoGPS();
         }
 
         function plotarPinsNoMapa() {
             if (!map || pontosHistoricos.length === 0) return;
             map.setCenter({ lat: pontosHistoricos[0].lat, lng: pontosHistoricos[0].lng });
+
+            listaMarcadoresMapa = [];
 
             pontosHistoricos.forEach(ponto => {
                 const pinElement = new google.maps.Marker({
@@ -333,6 +372,12 @@
 
                 pinElement.addListener("click", () => {
                     infoWindow.open(map, pinElement);
+                });
+
+                listaMarcadoresMapa.push({
+                    ponto: ponto,
+                    marker: pinElement,
+                    infoWindow: infoWindow
                 });
             });
         }
