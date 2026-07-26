@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CTG - Cultural Tourist Guide</title>
+    <title>CTG - Cultural Tourist Guide v1.0</title>
     
     <style>
         html, body { 
@@ -63,17 +63,6 @@
             flex-shrink: 0;
         }
 
-        #painel-diagnostico {
-            background: #fefcbf;
-            color: #744210;
-            font-size: 10px;
-            padding: 4px;
-            max-height: 50px;
-            overflow-y: auto;
-            border-bottom: 1px solid #d69e2e;
-            display: none;
-        }
-
         #map { 
             width: 100%; 
             flex-grow: 1; 
@@ -97,8 +86,16 @@
         }
         .btn-tour:active { background: #d35400; }
 
-        .gm-style-iw { max-width: 280px !important; padding: 6px !important; }
-        .gm-style-iw-d { overflow-x: hidden !important; overflow-y: auto !important; max-height: 280px !important; }
+        /* Ajuste do tamanho e altura vertical dos balões (InfoWindow) */
+        .gm-style-iw { 
+            max-width: 320px !important; 
+            padding: 8px !important; 
+        }
+        .gm-style-iw-d { 
+            overflow-x: hidden !important; 
+            overflow-y: auto !important; 
+            max-height: 520px !important; 
+        }
         
         audio {
             width: 100%;
@@ -125,7 +122,6 @@
     </div>
 
     <div id="status-carregamento">🔄 Sincronizando dados com a planilha...</div>
-    <div id="painel-diagnostico"></div>
 
     <div id="map"></div>
 
@@ -207,9 +203,8 @@
                 
                 pontosHistoricos = [];
                 let contadorId = 1;
-                let listaNomesLidos = [];
 
-                linhas.forEach((linha, index) => {
+                linhas.forEach((linha) => {
                     try {
                         if (!linha || !linha.c) return;
                         
@@ -222,7 +217,7 @@
 
                         let nomePatrimonio = linha.c[0] ? String(extrairValorCelula(linha.c[0])).trim() : "";
                         
-                        // Ignora apenas se a célula da coluna A estiver completamente vazia ou for o cabeçalho exato
+                        // Ignora apenas se a célula da coluna A estiver vazia ou for o cabeçalho
                         if (!nomePatrimonio || nomePatrimonio.toLowerCase() === "patrimônio / monumento") return;
 
                         let latRaw = linha.c[1] ? String(extrairValorCelula(linha.c[1])).replace(',', '.').replace(/[^\d.-]/g, '').trim() : "";
@@ -249,18 +244,11 @@
                                 categoria: categoria,
                                 foto: linkFoto
                             });
-                            listaNomesLidos.push(nomePatrimonio);
                         }
                     } catch (e) { console.warn(e); }
                 });
 
                 document.getElementById("status-carregamento").innerHTML = `✅ ${pontosHistoricos.length} monumentos carregados da planilha`;
-                
-                // Exibe a lista dos pontos lidos para conferência
-                const diagEl = document.getElementById("painel-diagnostico");
-                diagEl.style.display = "block";
-                diagEl.innerHTML = "<b>Lidos:</b> " + listaNomesLidos.join(" | ");
-
                 plotarPinsNoMapa();
 
             } catch (erro) {
@@ -344,7 +332,7 @@
                     }, 400);
                 }
             } else {
-                // Fora do raio: atualiza a barra avisando a distância do ponto mais próximo sem abrir o balão
+                // Fora do raio: atualiza a barra avisando a distância do ponto mais próximo
                 document.getElementById("status-carregamento").innerHTML = `🚶‍♂️ Em deslocamento... Próximo: "${nomePontoMaisProximo}" (${Math.round(menorDistanciaGeral)}m)`;
                 ultimoPontoTocadoId = null;
             }
@@ -415,19 +403,19 @@
             listaMarcadoresMapa = [];
 
             pontosHistoricos.forEach(ponto => {
-                // Personaliza o ícone do pino com a sua logo
+                // Personaliza o ícone do pino com a logo do CTG
                 const iconeLogo = {
                     url: 'logo-ctg-new.png',
-                    scaledSize: new google.maps.Size(30, 38), // Ajusta o tamanho da logo no mapa (30x38 pixels)
+                    scaledSize: new google.maps.Size(30, 38),
                     origin: new google.maps.Point(0, 0),
-                    anchor: new google.maps.Point(16, 16)     // Centraliza a imagem exatamente no ponto
+                    anchor: new google.maps.Point(16, 16)
                 };
 
                 const pinElement = new google.maps.Marker({
                     position: { lat: ponto.lat, lng: ponto.lng },
                     map: map,
                     title: ponto.nome,
-                    icon: iconeLogo // Usa o novo ícone em vez do pino vermelho
+                    icon: iconeLogo
                 });
 
                 const idAudioTag = `audio-ponto-${ponto.id}`;
@@ -436,7 +424,7 @@
                     '<h3 style="margin:0 0 6px 0;font-size:14px;color:#1a365d;font-weight:bold;">' + ponto.nome + '</h3>';
                 
                 if (ponto.foto && ponto.foto.trim() !== "") {
-                    conteudoModal += '<iframe src="' + ponto.foto + '" style="width:100%; height:120px; border:none; border-radius:4px; margin-bottom:6px;" scrolling="no"></iframe>';
+                    conteudoModal += '<iframe src="' + ponto.foto + '" style="width:100%; height:140px; border:none; border-radius:4px; margin-bottom:6px;" scrolling="no"></iframe>';
                 }
                 
                 conteudoModal += '<p style="margin:0 0 8px 0;font-size:12px;color:#2d3748;line-height:1.3;text-align:justify;">' + (ponto.resumo || '') + '</p>';
