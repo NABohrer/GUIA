@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CTG - Cultural Tourist Guide v1.0</title>
+    <title>CTG - Cultural Tourist Guide v1.1</title>
     
     <style>
         html, body { 
@@ -51,6 +51,8 @@
             flex-shrink: 0;
             border-bottom: 1px solid #cbd5e0;
             z-index: 10;
+            display: flex;
+            gap: 8px;
         }
 
         #status-carregamento { 
@@ -73,18 +75,35 @@
             background: #e67e22; 
             color: white; 
             border: none; 
-            padding: 10px 14px; 
+            padding: 10px 12px; 
             font-size: 13px; 
             font-weight: bold; 
             border-radius: 6px; 
             cursor: pointer; 
-            width: 100%; 
+            flex: 2;
             box-sizing: border-box;
             transition: background 0.2s; 
             text-align: center;
             display: block;
         }
         .btn-tour:active { background: #d35400; }
+
+        .btn-localizacao {
+            background: #2b6cb0;
+            color: white;
+            border: none;
+            padding: 10px 12px;
+            font-size: 13px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            flex: 1;
+            box-sizing: border-box;
+            transition: background 0.2s;
+            text-align: center;
+            display: block;
+        }
+        .btn-localizacao:active { background: #2c5282; }
 
         /* Ajuste do tamanho e altura vertical dos balões (InfoWindow) */
         .gm-style-iw { 
@@ -119,6 +138,7 @@
 
     <div id="tour-control">
         <button class="btn-tour" onclick="iniciarTourPresencial()">🚀 Iniciar Tour Presencial</button>
+        <button class="btn-localizacao" onclick="centralizarNoUsuario()">📍 Onde estou</button>
     </div>
 
     <div id="status-carregamento">🔄 Sincronizando dados com a planilha...</div>
@@ -131,6 +151,7 @@
         let map;
         let pontosHistoricos = [];
         let marcadorUsuario = null;
+        let posAtualUsuario = null;
         let idMonitoramentoGPS = null;
         let listaMarcadoresMapa = [];
         let ultimoPontoTocadoId = null; 
@@ -193,7 +214,6 @@
             if (!spreadsheetId) return;
 
             try {
-                // Força a leitura da primeira aba (gid=0)
                 const urlGviz = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&gid=0`;
                 const resposta = await fetch(urlGviz);
                 const textoCompleto = await resposta.text();
@@ -217,7 +237,6 @@
 
                         let nomePatrimonio = linha.c[0] ? String(extrairValorCelula(linha.c[0])).trim() : "";
                         
-                        // Ignora apenas se a célula da coluna A estiver vazia ou for o cabeçalho
                         if (!nomePatrimonio || nomePatrimonio.toLowerCase() === "patrimônio / monumento") return;
 
                         let latRaw = linha.c[1] ? String(extrairValorCelula(linha.c[1])).replace(',', '.').replace(/[^\d.-]/g, '').trim() : "";
@@ -271,6 +290,8 @@
         }
 
         function atualizarPosicaoNaTela(pos) {
+            posAtualUsuario = pos;
+
             if (!marcadorUsuario) {
                 marcadorUsuario = new google.maps.Marker({
                     position: pos,
@@ -285,6 +306,33 @@
 
             if (tourIniciado) {
                 verificarProximidadeEPlay(pos);
+            }
+        }
+
+        function centralizarNoUsuario() {
+            if (posAtualUsuario) {
+                map.setCenter(posAtualUsuario);
+                map.setZoom(17); // Zoom mediano para visualizar o usuário e monumentos ao redor
+            } else {
+                if ("geolocation" in navigator) {
+                    navigator.geolocation.getCurrentPosition(
+                        (posicao) => {
+                            const pos = {
+                                lat: posicao.coords.latitude,
+                                lng: posicao.coords.longitude
+                            };
+                            atualizarPosicaoNaTela(pos);
+                            map.setCenter(pos);
+                            map.setZoom(17);
+                        },
+                        (erro) => {
+                            alert("Não foi possível obter sua localização atual. Verifique se o GPS está ativado.");
+                        },
+                        { enableHighAccuracy: true, maximumAge: 0 }
+                    );
+                } else {
+                    alert("Geolocalização não suportada no seu aparelho.");
+                }
             }
         }
 
@@ -306,7 +354,6 @@
                     nomePontoMaisProximo = item.ponto.nome;
                 }
 
-                // Respeita estritamente o raio definido na planilha
                 const raioEfetivo = item.ponto.raio || 25;
 
                 if (dist <= raioEfetivo) {
@@ -332,7 +379,6 @@
                     }, 400);
                 }
             } else {
-                // Fora do raio: atualiza a barra avisando a distância do ponto mais próximo
                 document.getElementById("status-carregamento").innerHTML = `🚶‍♂️ Em deslocamento... Próximo: "${nomePontoMaisProximo}" (${Math.round(menorDistanciaGeral)}m)`;
                 ultimoPontoTocadoId = null;
             }
@@ -385,7 +431,6 @@
                     map.setCenter(posUsuario);
                     map.setZoom(18);
 
-                    // Valida imediatamente a posição contra o raio dos pontos
                     verificarProximidadeEPlay(posUsuario);
                 },
                 (erro) => {
@@ -401,9 +446,9 @@
             if (!map || pontosHistoricos.length === 0) return;
             
             listaMarcadoresMapa = [];
+            const limitesMapa = new google.maps.LatLngBounds();
 
             pontosHistoricos.forEach(ponto => {
-                // Personaliza o ícone do pino com a logo do CTG
                 const iconeLogo = {
                     url: 'logo-ctg-new.png',
                     scaledSize: new google.maps.Size(30, 38),
@@ -411,12 +456,17 @@
                     anchor: new google.maps.Point(16, 16)
                 };
 
+                const posPonto = { lat: ponto.lat, lng: ponto.lng };
+
                 const pinElement = new google.maps.Marker({
-                    position: { lat: ponto.lat, lng: ponto.lng },
+                    position: posPonto,
                     map: map,
                     title: ponto.nome,
                     icon: iconeLogo
                 });
+
+                // Inclui as coordenadas do ponto para ajustar os limites do mapa
+                limitesMapa.extend(posPonto);
 
                 const idAudioTag = `audio-ponto-${ponto.id}`;
 
@@ -453,6 +503,9 @@
                     infoWindow: infoWindow
                 });
             });
+
+            // Ajusta a visão do mapa para mostrar TODOS os pontos carregados
+            map.fitBounds(limitesMapa);
         }
     </script>
 </body>
