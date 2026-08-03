@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Plataforma hip.hop - Versão Alpha-Teste</title>
 
-<!-- 📊 Google Tag (gtag.js) - Insira o seu ID do GA4 no lugar de G-SEU_ID_GA4_AQUI -->
+<!-- 📊 Google Analytics 4 (GA4) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-8YBRS5NX34"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
 
-  gtag('config', 'G-SEU_ID_GA4_AQUI');
+  gtag('config', 'G-8YBRS5NX34');
 </script>
 
 <style>
@@ -64,10 +64,11 @@ html, body {
   font-size: 11px;
   font-weight: 600;
   color: #4a5568;
-  padding: 4px;
+  padding: 6px;
   text-align: center;
   background: #edf2f7;
   flex-shrink: 0;
+  line-height: 1.4;
 }
 #map {
   width: 100%;
@@ -107,7 +108,7 @@ html, body {
 }
 .btn-localizacao:active { background: #2c5282; }
 
-/* Ajustes dos Balões (InfoWindow) */
+/* Modal e Popups do Mapa */
 .gm-style-iw {
   max-width: 320px !important;
   padding: 8px !important;
@@ -123,6 +124,17 @@ audio {
   margin-top: 6px;
   outline: none;
 }
+.badge-tag {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: bold;
+  border-radius: 4px;
+  color: white;
+  margin-bottom: 4px;
+}
+.tag-estrada { background-color: #27ae60; }
+.tag-urbano { background-color: #2b6cb0; }
 </style>
 
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAxjwD6OU5pNjdr-6J9xhc7Ut5E-IzSZYM&callback=initApp" async defer></script>
@@ -211,7 +223,7 @@ async function carregarDadosPlanilha() {
   if (!spreadsheetId) return;
 
   try {
-    const urlGviz = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&gid=0`;
+    const urlGviz = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json`;
     const resposta = await fetch(urlGviz);
     const textoCompleto = await resposta.text();
     const jsonPuro = JSON.parse(textoCompleto.substring(textoCompleto.indexOf('{'), textoCompleto.lastIndexOf('}') + 1));
@@ -219,6 +231,8 @@ async function carregarDadosPlanilha() {
 
     pontosHistoricos = [];
     let contadorId = 1;
+    let totalUrbano = 0;
+    let totalEstrada = 0;
 
     linhas.forEach((linha) => {
       try {
@@ -231,44 +245,51 @@ async function carregarDadosPlanilha() {
           return "";
         };
 
-        // 0: PATRIMÔNIO / MONUMENTO
+        // Coluna 0: Nome do Patrimônio
         let nomePatrimonio = linha.c[0] ? String(extrairValorCelula(linha.c[0])).trim() : "";
-        if (!nomePatrimonio || nomePatrimonio.toLowerCase() === "patrimônio / monumento") return;
+        
+        // Ignora apenas linhas de cabeçalho
+        const nomeLower = nomePatrimonio.toLowerCase();
+        if (!nomePatrimonio || nomeLower.includes("patrimônio") || nomeLower.includes("monumento") || nomeLower === "nome") {
+          return;
+        }
 
-        // 1: LATITUDE | 2: LONGITUDE
+        // Coluna 1: Lat | Coluna 2: Lng
         let latRaw = linha.c[1] ? String(extrairValorCelula(linha.c[1])).replace(',', '.').replace(/[^\d.-]/g, '').trim() : "";
         let lngRaw = linha.c[2] ? String(extrairValorCelula(linha.c[2])).replace(',', '.').replace(/[^\d.-]/g, '').trim() : "";
 
-        // 3: 🆕 BALÃO ('U' - Urbano ou 'E' - Estrada)
+        // Coluna 3: BALÃO ('U' - Urbano ou 'E' - Estrada)
         let tipoBalaoRaw = linha.c[3] ? String(extrairValorCelula(linha.c[3])).trim().toUpperCase() : "U";
         let tipoBalao = (tipoBalaoRaw === "E") ? "E" : "U";
 
-        // 4: RESUMO PARA A FALA
+        // Coluna 4: Resumo
         let resumo = linha.c[4] ? String(extrairValorCelula(linha.c[4])).trim() : "";
 
-        // 5: LINK DO ÁUDIO
+        // Coluna 5: Áudio
         let linkAudio = linha.c[5] ? tratarLinkMidia(extrairValorCelula(linha.c[5]), "audio") : "";
 
-        // 6: RAIO (Se não definido, Estrada pega 80m e Urbano 25m)
+        // Coluna 6: Raio de Ação (Estrada = 150m, Urbano = 25m)
         let raioPredefinido = linha.c[6] ? parseInt(extrairValorCelula(linha.c[6])) : NaN;
-        let raioEfetivo = isNaN(raioPredefinido) ? (tipoBalao === "E" ? 80 : 25) : raioPredefinido;
+        let raioEfetivo = isNaN(raioPredefinido) ? (tipoBalao === "E" ? 150 : 25) : raioPredefinido;
 
-        // 7: OBSERVAÇÃO / CATEGORIA
+        // Coluna 7: Categoria
         let categoria = linha.c[7] ? String(extrairValorCelula(linha.c[7])).trim() : "";
 
-        // 8: LINK DA IMAGEM
+        // Coluna 8: Imagem
         let linkFoto = linha.c[8] ? tratarLinkMidia(extrairValorCelula(linha.c[8]), "foto") : "";
 
         let latNum = parseFloat(latRaw);
         let lngNum = parseFloat(lngRaw);
 
         if (!isNaN(latNum) && !isNaN(lngNum)) {
+          if (tipoBalao === "E") totalEstrada++; else totalUrbano++;
+
           pontosHistoricos.push({
             id: contadorId++,
             nome: nomePatrimonio,
             lat: latNum,
             lng: lngNum,
-            balao: tipoBalao, // Flag 'U' ou 'E'
+            balao: tipoBalao,
             resumo: resumo,
             audio: linkAudio,
             raio: raioEfetivo,
@@ -276,21 +297,31 @@ async function carregarDadosPlanilha() {
             foto: linkFoto
           });
         }
-      } catch (e) { console.warn(e); }
+      } catch (e) { console.warn("Erro ao processar linha da planilha:", e); }
     });
 
-    document.getElementById("status-carregamento").innerHTML = `✅ ${pontosHistoricos.length} monumentos carregados da planilha`;
+    document.getElementById("status-carregamento").innerHTML = `✅ ${pontosHistoricos.length} pontos carregados (Urbano: ${totalUrbano} | Estrada: ${totalEstrada}) | Planilha lida: ${linhas.length} linhas`;
+
+    // Registra métrica de carregamento no GA4
+    if (typeof gtag === 'function') {
+      gtag('event', 'dados_carregados', {
+        'total_pontos': pontosHistoricos.length,
+        'total_urbano': totalUrbano,
+        'total_estrada': totalEstrada
+      });
+    }
+
     plotarPinsNoMapa();
 
   } catch (erro) {
-    document.getElementById("status-carregamento").innerHTML = "❌ Erro na sincronização dos dados.";
+    document.getElementById("status-carregamento").innerHTML = "❌ Erro na sincronização dos dados da planilha.";
   }
 }
 
 function initApp() {
   const centroFriburgo = { lat: -22.2819, lng: -42.5320 };
   map = new google.maps.Map(document.getElementById("map"), {
-    zoom: 16,
+    zoom: 15,
     center: centroFriburgo,
     mapTypeControl: false,
     streetViewControl: false,
@@ -360,7 +391,7 @@ function verificarProximidadeEPlay(posUsuario) {
     const raioEfetivo = item.ponto.raio;
     if (dist <= raioEfetivo) {
       pontoEncontradoNoRaio = item;
-      const tagModo = (item.ponto.balao === 'E') ? '🚗 [Modo Drive]' : '🚶 [Modo Urbano]';
+      const tagModo = (item.ponto.balao === 'E') ? '🚗 [Modo Estrada]' : '🚶 [Modo Urbano]';
       document.getElementById("status-carregamento").innerHTML = `📍 ${tagModo} Dentro do raio de: "${item.ponto.nome}" (${Math.round(dist)}m)`;
     }
   });
@@ -378,7 +409,7 @@ function verificarProximidadeEPlay(posUsuario) {
             console.warn("O navegador bloqueou a reprodução automática:", e);
           });
 
-          // 📊 EVENTO GA4: Disparo por Geofencing (Proximidade GPS)
+          // 📊 EVENTO GA4: Disparo por Proximidade (Geofence)
           if (typeof gtag === 'function') {
             gtag('event', 'auto_play_geofence', {
               'ponto_id': pontoEncontradoNoRaio.ponto.id,
@@ -391,7 +422,7 @@ function verificarProximidadeEPlay(posUsuario) {
       }, 400);
     }
   } else {
-    document.getElementById("status-carregamento").innerHTML = `‍♂️ Em deslocamento... Próximo: "${nomePontoMaisProximo}" (${Math.round(menorDistanciaGeral)}m)`;
+    document.getElementById("status-carregamento").innerHTML = `🚗 Em deslocamento... Próximo: "${nomePontoMaisProximo}" (${Math.round(menorDistanciaGeral)}m)`;
     ultimoPontoTocadoId = null;
   }
 }
@@ -415,7 +446,6 @@ function iniciarRastreamentoGPS() {
 function iniciarTourPresencial() {
   tourIniciado = true;
 
-  // 📊 EVENTO GA4: Início do Tour Presencial
   if (typeof gtag === 'function') {
     gtag('event', 'start_tour', { 'method': 'GPS_Tracking' });
   }
@@ -446,14 +476,14 @@ function plotarPinsNoMapa() {
   const limitesMapa = new google.maps.LatLngBounds();
 
   pontosHistoricos.forEach(ponto => {
-    // 🎨 Seleção do Ícone com base na nova coluna 'BALÃO' ('U' ou 'E')
-    let arquivoIcone = (ponto.balao === 'E') ? 'logo-ctg-estrada.png' : 'logo-ctg-new.png';
+    // 🎨 Seleciona a imagem Balao_E.png ou Balao_U.png
+    const arquivoIcone = (ponto.balao === 'E') ? 'Balao_E.png' : 'Balao_U.png';
 
     const iconeLogo = {
       url: arquivoIcone,
-      scaledSize: new google.maps.Size(30, 38),
+      scaledSize: new google.maps.Size(32, 40),
       origin: new google.maps.Point(0, 0),
-      anchor: new google.maps.Point(15, 19)
+      anchor: new google.maps.Point(16, 20)
     };
 
     const posPonto = { lat: ponto.lat, lng: ponto.lng };
@@ -467,8 +497,13 @@ function plotarPinsNoMapa() {
     limitesMapa.extend(posPonto);
     const idAudioTag = `audio-ponto-${ponto.id}`;
 
+    const tagBadge = (ponto.balao === 'E') 
+      ? '<span class="badge-tag tag-estrada">🛣️ Balão Estrada (' + ponto.raio + 'm)</span>'
+      : '<span class="badge-tag tag-urbano">🏙️ Balão Urbano (' + ponto.raio + 'm)</span>';
+
     let conteudoModal = '<div style="width:100%; font-family:sans-serif; padding:2px; box-sizing:border-box;">' +
-      '<h3 style="margin:0 0 6px 0;font-size:14px;color:#1a365d;font-weight:bold;">' + ponto.nome + '</h3>';
+      tagBadge +
+      '<h3 style="margin:2px 0 6px 0;font-size:14px;color:#1a365d;font-weight:bold;">' + ponto.nome + '</h3>';
 
     if (ponto.foto && ponto.foto.trim() !== "") {
       conteudoModal += '<iframe src="' + ponto.foto + '" style="width:100%; height:140px; border:none; border-radius:4px; margin-bottom:6px;" scrolling="no"></iframe>';
@@ -489,7 +524,6 @@ function plotarPinsNoMapa() {
 
     const infoWindow = new google.maps.InfoWindow({ content: conteudoModal });
 
-    // 📊 EVENTO GA4: Clique Manual no Marcador
     pinElement.addListener("click", () => {
       infoWindow.open(map, pinElement);
 
@@ -515,4 +549,3 @@ function plotarPinsNoMapa() {
 </script>
 </body>
 </html>
-
