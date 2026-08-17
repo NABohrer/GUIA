@@ -220,7 +220,8 @@ audio {
 
 <div id="header">
   <div class="header-left">
-    <img src="../baloes/LOGO_CTG.png" alt="Logo CTG" class="header-logo">
+    <!-- 🖼️ Alterado de ../baloes/LOGO_CTG.png para carregar direto da raiz -->
+    <img src="LOGO_CTG.png" alt="Logo CTG" class="header-logo">
     <div class="header-text">
       <h2>2.0 Versão Multilíngue</h2>
       <p>DYART - Business Intelligence</p>
@@ -341,10 +342,8 @@ function resolverCaminhoAudio(rawInput, lang) {
     url += '.mp3';
   }
 
-  let pasta = "../audios/";
-  if (lang === "EN") pasta = "../audios_EN/";
-  if (lang === "ES") pasta = "../audios_ES/";
-
+  // 🎵 Como você disse que TODOS os arquivos estão na raiz (main), os áudios locais também passam a ser buscados na raiz
+  let pasta = "";
   return pasta + url;
 }
 
@@ -420,9 +419,9 @@ async function carregarDadosPlanilha() {
         let raioVal = parseInt(val(6));
         let raioEfetivo = isNaN(raioVal) ? (tipoBalao === "E" ? 150 : 25) : raioVal;
         
-        let categoriaVal = val(7) || "Geral";
-        if (categoriaVal && categoriaVal !== "Geral") {
-          categoriasSet.add(categoriaVal);
+        let categoryVal = val(7) || "Geral";
+        if (categoryVal && categoryVal !== "Geral") {
+          categoriasSet.add(categoryVal);
         }
 
         let linkFoto = formatarLinkImagemDrive(val(8));
@@ -446,7 +445,7 @@ async function carregarDadosPlanilha() {
             lng: lngNum,
             balao: tipoBalao,
             raio: raioEfetivo,
-            categoria: categoriaVal,
+            categoria: categoryVal,
             foto: linkFoto,
             resumo: { PT: resumoPT, EN: resumoEN, ES: resumoES },
             audioArquivo: { PT: audioPT, EN: audioEN, ES: audioES }
@@ -650,8 +649,8 @@ function plotarPinsNoMapa() {
   pontosHistoricos.forEach(ponto => {
     if (categoriaAtiva !== "TODAS" && ponto.categoria !== categoriaAtiva) return;
 
-    // 🎈 Ajustado aqui para os novos nomes exatos de arquivos de balão:
-    const arquivoIcone = (ponto.balao === 'E') ? '../baloes/Balao_E.png' : '../baloes/Balao_U.png';
+    // 🎈 Alterado aqui para buscar os arquivos Balao_E.png e Balao_U.png direto da raiz (sem a pasta baloes)
+    const arquivoIcone = (ponto.balao === 'E') ? 'Balao_E.png' : 'Balao_U.png';
     const iconeCustom = L.icon({
       iconUrl: arquivoIcone,
       iconSize: [32, 40],
