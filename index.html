@@ -253,7 +253,7 @@ let marcadorUsuario = null;
 let posAtualUsuario = null;
 let idMonitoramentoGPS = null;
 let listaMarcadoresMapa = [];
-let ultimoPonto TocadoId = null;
+let ultimoPontoTocadoId = null;
 let tourIniciado = false;
 let categoriaAtiva = "TODAS";
 let idiomaAtual = "PT";
@@ -446,7 +446,7 @@ async function carregarDadosPlanilha() {
             lng: lngNum,
             balao: tipoBalao,
             raio: raioEfetivo,
-            categoria: categoryVal,
+            categoria: categoriaVal,
             foto: linkFoto,
             resumo: { PT: resumoPT, EN: resumoEN, ES: resumoES },
             audioArquivo: { PT: audioPT, EN: audioEN, ES: audioES }
@@ -650,7 +650,7 @@ function plotarPinsNoMapa() {
   pontosHistoricos.forEach(ponto => {
     if (categoriaAtiva !== "TODAS" && ponto.categoria !== categoriaAtiva) return;
 
-    // 🎈 Ajustado aqui para os novos nomes de arquivos de balão:
+    // 🎈 Ajustado aqui para os novos nomes exatos de arquivos de balão:
     const arquivoIcone = (ponto.balao === 'E') ? '../baloes/Balao_E.png' : '../baloes/Balao_U.png';
     const iconeCustom = L.icon({
       iconUrl: arquivoIcone,
