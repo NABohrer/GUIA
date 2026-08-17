@@ -220,9 +220,9 @@ audio {
 
 <div id="header">
   <div class="header-left">
-    <img src="../baloes/Logo_hiphop.png" alt="Logo hip.hop" class="header-logo">
+    <img src="../baloes/LOGO_CTG.png" alt="Logo CTG" class="header-logo">
     <div class="header-text">
-      2.0 Versão Multilíngue</h2>
+      <h2>2.0 Versão Multilíngue</h2>
       <p>DYART - Business Intelligence</p>
     </div>
   </div>
@@ -253,7 +253,7 @@ let marcadorUsuario = null;
 let posAtualUsuario = null;
 let idMonitoramentoGPS = null;
 let listaMarcadoresMapa = [];
-let ultimoPontoTocadoId = null;
+let ultimoPonto TocadoId = null;
 let tourIniciado = false;
 let categoriaAtiva = "TODAS";
 let idiomaAtual = "PT";
@@ -289,7 +289,7 @@ const TRADUCOES = {
   ES: {
     tour: "🚀 Iniciar Recorrido",
     gps: "📍 Mi Ubicación",
-    sincronizando: "🔄 Sincronizando datos con la planilla...",
+    sincronizando: "🔄 Sincronizando datos con la planilha...",
     carregados: "✅ {qtd} puntos cargados (Urbano: {u} | Carretera: {e})",
     erroPlanilha: "❌ Error en la sincronización de datos.",
     todasCategorias: "🌐 Todas",
@@ -326,7 +326,6 @@ function resolverCaminhoAudio(rawInput, lang) {
   if (!rawInput) return "";
   let url = String(rawInput).trim();
 
-  // Se a planilha enviou fórmula ou hiperlink embutido
   if (url.includes('="') || url.includes('("')) {
     const matchFormula = url.match(/"([^"\\]+)"/);
     if (matchFormula) url = matchFormula[1];
@@ -334,12 +333,10 @@ function resolverCaminhoAudio(rawInput, lang) {
 
   url = url.replace(/['"]/g, '').trim();
 
-  // Se já for uma URL completa (HTTPS)
   if (url.startsWith('http://') || url.startsWith('https://')) {
     return url;
   }
 
-  // Compatibilidade com fallback local caso haja nomes simples soltos
   if (!url.toLowerCase().endsWith('.mp3')) {
     url += '.mp3';
   }
@@ -449,7 +446,7 @@ async function carregarDadosPlanilha() {
             lng: lngNum,
             balao: tipoBalao,
             raio: raioEfetivo,
-            categoria: categoriaVal,
+            categoria: categoryVal,
             foto: linkFoto,
             resumo: { PT: resumoPT, EN: resumoEN, ES: resumoES },
             audioArquivo: { PT: audioPT, EN: audioEN, ES: audioES }
@@ -653,6 +650,7 @@ function plotarPinsNoMapa() {
   pontosHistoricos.forEach(ponto => {
     if (categoriaAtiva !== "TODAS" && ponto.categoria !== categoriaAtiva) return;
 
+    // 🎈 Ajustado aqui para os novos nomes de arquivos de balão:
     const arquivoIcone = (ponto.balao === 'E') ? '../baloes/Balao_E.png' : '../baloes/Balao_U.png';
     const iconeCustom = L.icon({
       iconUrl: arquivoIcone,
