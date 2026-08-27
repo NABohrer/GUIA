@@ -77,7 +77,7 @@ background: #e67e22;
 border-color: #e67e22;
 }
 
-/* Barra de Controle Ajustada (Sem botão 3D) */
+/* Barra de Controle Ajustada */
 #tour-control {
 background: #ffffff;
 padding: 8px 12px;
@@ -174,7 +174,7 @@ z-index: 1;
 }
 
 /* Badges e Mídia */
-audio { width: 100%; height: 36px; margin-top: 6px; }
+audio { width: 100%; height: 36px; margin-top: 6px; display: block; }
 .badge-tag {
 display: inline-block;
 padding: 2px 6px;
@@ -193,16 +193,30 @@ max-height: 140px;
 object-fit: cover;
 border-radius: 6px;
 margin-bottom: 6px;
+display: block;
+}
+
+/* 🎯 CORREÇÃO DO POPUP NO LEAFLET PARA NÃO CORTAR ÁUDIO */
+.leaflet-popup-content-wrapper {
+padding: 4px;
+border-radius: 8px;
+box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+.leaflet-popup-content {
+margin: 8px 12px !important;
+line-height: 1.4;
+max-width: 270px !important;
+width: 270px !important;
 }
 </style>
 </head>
 <body>
 <div id="header">
 <div class="header-left">
-<img src="../baloes/LOGO_CTG.png" alt="Logo CTG" class="header-logo">
+<img src="../baloes/Logo_hiphop.png" alt="Logo hip.hop" class="header-logo">
 <div class="header-text">
-<h2>PROJETO CTG 2D</h2>
-<p>Fundação D. João VI de Nova Friburgo </p>
+<h2>Plataforma hip.hop 2D</h2>
+<p>DYART - Business Intelligence (Rio de Janeiro)</p>
 </div>
 </div>
 <div class="lang-selector">
@@ -247,7 +261,7 @@ document.addEventListener('keydown', e => {
     }
 })();
 
-const LINK_DA_PLANILHA = 'https://docs.google.com/spreadsheets/d/1o-zFjux3l5nkL83PsruG9ngLoEwPPe9NvEhd1kWRwPQ/edit?usp=sharing';
+const LINK_DA_PLANILHA = 'https://docs.google.com/spreadsheets/d/1cHfaZWEXlhhzFKGpR3KqvkIqcLAitNOdYuhUNXysESg/edit?usp=sharing';
 
 let map;
 let pontosHistoricos = [];
@@ -264,9 +278,9 @@ let pontosTocadosTour = new Set();
 let linhaConectora = null;
 
 const TRADUCOES = {
-PT: { tour: "🚀 Iniciar Tour Presencial", tourParar: "🛑 Parar Tour Presencial", gps: "📍 Onde estou", carregados: "✅ {qtd} pontos no RJ carregados", ouvirHistoria: "🎵 Ouvir História:" },
-EN: { tour: "🚀 Start Live Tour", tourParar: "🛑 Stop Live Tour", gps: "📍 My Location", carregados: "✅ {qtd} RJ spots loaded", ouvirHistoria: "🎵 Listen to Story:" },
-ES: { tour: "🚀 Iniciar Recorrido", tourParar: "🛑 Detener Recorrido", gps: "📍 Mi Ubicación", carregados: "✅ {qtd} puntos en RJ cargados", ouvirHistoria: "🎵 Escuchar Historia:" }
+PT: { tour: "🚀 Iniciar Tour Presencial", tourParar: "🛑 Parar Tour Presencial", gps: "📍 Onde estou", carregados: "✅ {qtd} pontos no RJ carregados", ouvirHistoria: "🎵 Ouvir História:", todasCategorias: "🌐 Todas" },
+EN: { tour: "🚀 Start Live Tour", tourParar: "🛑 Stop Live Tour", gps: "📍 My Location", carregados: "✅ {qtd} RJ spots loaded", ouvirHistoria: "🎵 Listen to Story:", todasCategorias: "🌐 All" },
+ES: { tour: "🚀 Iniciar Recorrido", tourParar: "🛑 Detener Recorrido", gps: "📍 Mi Ubicación", carregados: "✅ {qtd} puntos en RJ cargados", ouvirHistoria: "🎵 Escuchar Historia:", todasCategorias: "🌐 Todas" }
 };
 
 function initMapOSM() {
@@ -410,10 +424,10 @@ function verificarProximidadePontos(posicao) {
 
         const distTexto = menorDistancia > 1000 
             ? `${(menorDistancia / 1000).toFixed(1)} km` 
-            : `${Math.round(menorDistancia)} meters`;
+            : `${Math.round(menorDistancia)}m`;
         
         document.getElementById("status-carregamento").innerHTML = 
-            `🚶 Ponto mais próximo: <b>pontoMaisProximo.nome</b>({distTexto})`;
+            `🚶 Ponto mais próximo: <b>${pontoMaisProximo.nome}</b> (${distTexto})`;
     }
 }
 
@@ -441,7 +455,7 @@ function resolverCaminhoAudio(rawInput, lang) {
     if (nomeArquivo.startsWith('http://') || nomeArquivo.startsWith('https://')) return nomeArquivo;
     if (nomeArquivo.includes('/')) return nomeArquivo;
 
-    return `../audios_lang/{nomeArquivo}`;
+    return `../audios_lang/${nomeArquivo}`;
 }
 
 function formatarLinkImagemDrive(url) {
@@ -550,16 +564,19 @@ function plotarPinsNoMapa() {
         const urlAudio = ponto.audioArquivo[idiomaAtual] || ponto.audioArquivo['PT'] || '';
         const idAudio = `audio-ponto-${ponto.id}`;
 
-        let htmlModal = `<div style="max-width:260px; font-family:sans-serif;">` +
-        `<span class="badge-tag ponto.balao==='E'?'tag-estrada':'tag-urbano'">{ponto.balao === 'E' ? 'Estrada' : 'Urbano'} (${ponto.raio}m)</span>` +
+        let tagClasse = ponto.balao === 'E' ? 'tag-estrada' : 'tag-urbano';
+        let tagTexto = ponto.balao === 'E' ? 'Estrada' : 'Urbano';
+
+        let htmlModal = `<div style="font-family:sans-serif;">` +
+        `<span class="badge-tag ${tagClasse}">${tagTexto} (${ponto.raio}m)</span>` +
         (ponto.categoria ? `<span class="badge-tag tag-categoria">${ponto.categoria}</span>` : '') +
         `<h3 style="margin:4px 0; font-size:14px; color:#1a365d;">${ponto.nome}</h3>` +
-        (ponto.foto ? `<img src="ponto.foto"class="popup-img"alt="{ponto.nome}">` : '') +
+        (ponto.foto ? `<img src="${ponto.foto}" class="popup-img" alt="${ponto.nome}">` : '') +
         `<p style="margin:0 0 6px 0; font-size:12px; color:#4a5568;">${textoResumo}</p>` +
-        (urlAudio ? `<label style="font-size:11px; font-weight:bold; color:#1a365d;">t.ouvirHistoria</label><audioid="{idAudio}" controls src="${urlAudio}"></audio>` : '') +
+        (urlAudio ? `<label style="font-size:11px; font-weight:bold; color:#1a365d;">${t.ouvirHistoria}</label><audio id="${idAudio}" controls src="${urlAudio}"></audio>` : '') +
         `</div>`;
 
-        marker.bindPopup(htmlModal);
+        marker.bindPopup(htmlModal, { maxWidth: 280 });
         listaMarcadoresMapa.push({ ponto: ponto, marker: marker });
     });
 
@@ -570,9 +587,11 @@ function plotarPinsNoMapa() {
 
 function gerarBotoesFiltro(lista) {
     const container = document.getElementById('filter-bar');
-    let html = `<button class="btn-filter categoriaAtiva==='TODAS'?'active':''"onclick="filtrarCategoria('TODAS',this)">{TRADUCOES[idiomaAtual].todasCategorias || '🌐 Todas'}</button>`;
+    let classeTodas = categoriaAtiva === 'TODAS' ? 'active' : '';
+    let html = `<button class="btn-filter ${classeTodas}" onclick="filtrarCategoria('TODAS',this)">${TRADUCOES[idiomaAtual].todasCategorias}</button>`;
     lista.forEach(cat => {
-        html += `<button class="btn-filter categoriaAtiva===cat?'active':''"onclick="filtrarCategoria('{cat}', this)">${cat}</button>`;
+        let classeCat = categoriaAtiva === cat ? 'active' : '';
+        html += `<button class="btn-filter ${classeCat}" onclick="filtrarCategoria('${cat}', this)">${cat}</button>`;
     });
     container.innerHTML = html;
 }
